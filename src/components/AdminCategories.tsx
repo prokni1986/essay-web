@@ -1,6 +1,7 @@
-// file: components/AdminCategories.tsx
+// file: src/components/AdminCategories.tsx
 import React, { useEffect, useState, ChangeEvent, FormEvent } from 'react';
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios'; // Still needed for axios.isAxiosError and AxiosError type
+import axiosInstance from '../lib/axiosInstance'; // Corrected path
 
 type Category = {
   _id: string;
@@ -30,14 +31,14 @@ const AdminCategories: React.FC = () => {
 
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const API_URL = 'http://localhost:5050/api/categories';
+  const CATEGORIES_API_PATH = '/api/categories';
 
   const fetchCategories = async () => {
     setIsLoading(true);
     try {
-      const res = await axios.get<Category[]>(API_URL);
+      const res = await axiosInstance.get<Category[]>(CATEGORIES_API_PATH);
       setCategories(Array.isArray(res.data) ? res.data : []);
-      setCurrentPage(1); // Reset to first page on fetch
+      setCurrentPage(1);
     } catch (err) {
       console.error("Lỗi khi tải danh sách chuyên mục:", err);
       setErrorMessage("Không thể tải danh sách chuyên mục.");
@@ -67,13 +68,13 @@ const AdminCategories: React.FC = () => {
     setErrorMessage('');
 
     try {
-      await axios.post(API_URL, {
+      await axiosInstance.post(CATEGORIES_API_PATH, {
         name: newCategoryName.trim(),
         description: newCategoryDescription.trim(),
       });
       setMessage('Thêm chuyên mục thành công!');
       resetAddForm();
-      fetchCategories(); // Refresh list
+      fetchCategories();
     } catch (error) {
       console.error("Lỗi khi thêm chuyên mục:", error);
       let errMsg = 'Lỗi không xác định khi thêm chuyên mục.';
@@ -87,7 +88,6 @@ const AdminCategories: React.FC = () => {
       setIsLoading(false);
       setTimeout(() => {
         setMessage('');
-        // setErrorMessage(''); // Keep error message for a bit longer if needed
       }, 3000);
     }
   };
@@ -121,12 +121,12 @@ const AdminCategories: React.FC = () => {
     setErrorMessage('');
 
     try {
-      await axios.put(`${API_URL}/${editingId}`, {
+      await axiosInstance.put(`${CATEGORIES_API_PATH}/${editingId}`, {
         name: editingName.trim(),
         description: editingDescription.trim(),
       });
       setMessage('Cập nhật chuyên mục thành công!');
-      fetchCategories(); // Refresh list
+      fetchCategories();
       setTimeout(() => { cancelEdit(); }, 1500);
     } catch (error) {
       console.error("Lỗi khi sửa chuyên mục:", error);
@@ -137,9 +137,8 @@ const AdminCategories: React.FC = () => {
       } else if (error instanceof Error) { errMsg = error.message; }
       setErrorMessage(`Lỗi: ${errMsg}`);
       setMessage('');
-      setIsLoading(false); // Keep form open on error
+      setIsLoading(false);
     }
-    // setIsLoading(false) will be handled by cancelEdit on success, or above on error.
   };
 
   const handleDelete = async (id: string) => {
@@ -151,10 +150,10 @@ const AdminCategories: React.FC = () => {
     setMessage(`Đang xóa chuyên mục ${categoryToDelete?.name}...`);
     setErrorMessage('');
     try {
-      await axios.delete(`${API_URL}/${id}`);
+      await axiosInstance.delete(`${CATEGORIES_API_PATH}/${id}`);
       setMessage(`Chuyên mục "${categoryToDelete?.name || id}" đã được xóa.`);
-      fetchCategories(); // Refresh list
-      if (editingId === id) cancelEdit(); // If deleting the category currently being edited
+      fetchCategories();
+      if (editingId === id) cancelEdit();
     } catch (error) {
       console.error("Lỗi khi xóa chuyên mục:", error);
       let errMsg = 'Lỗi không xác định khi xóa chuyên mục.';
@@ -171,12 +170,10 @@ const AdminCategories: React.FC = () => {
       setIsLoading(false);
       setTimeout(() => {
           setMessage('');
-        //   setErrorMessage('');
       }, 5000);
     }
   };
 
-  // Pagination logic
   const indexOfLastCategory = currentPage * CATEGORIES_PER_PAGE;
   const indexOfFirstCategory = indexOfLastCategory - CATEGORIES_PER_PAGE;
   const currentCategories = categories.slice(indexOfFirstCategory, indexOfLastCategory);
@@ -189,7 +186,6 @@ const AdminCategories: React.FC = () => {
   };
 
   const renderPageNumbers = () => {
-    // Same logic as in AdminTopics, can be refactored into a common component later
     const pageNumbers = [];
     if (totalPages <= 1) return null;
     const maxPageButtons = 3;
@@ -213,17 +209,13 @@ const AdminCategories: React.FC = () => {
     return pageNumbers;
   };
 
-
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto bg-gray-50 min-h-screen">
       <h1 className="text-2xl sm:text-3xl font-semibold mb-6 sm:mb-8 text-center text-gray-800">Quản lý Chuyên mục (Categories)</h1>
 
-      {/* Message and Error Display */}
       {message && <div className="mb-4 p-3 rounded bg-green-100 text-green-700 border border-green-300">{message}</div>}
       {errorMessage && <div className="mb-4 p-3 rounded bg-red-100 text-red-700 border border-red-300">{errorMessage}</div>}
 
-
-      {/* Add Category Form (shown if not editing) */}
       {!editingId && (
         <form onSubmit={handleAddCategory} className="mb-8 sm:mb-10 p-5 sm:p-6 bg-white shadow-xl rounded-lg">
           <h2 className="text-xl sm:text-2xl font-medium mb-5 sm:mb-6 text-gray-700">Thêm Chuyên mục mới</h2>
@@ -256,7 +248,6 @@ const AdminCategories: React.FC = () => {
         </form>
       )}
 
-      {/* Edit Category Form (shown if editingId is set) */}
       {editingId && (
         <form onSubmit={handleEditCategory} className="mb-8 sm:mb-10 p-5 sm:p-6 bg-white shadow-xl rounded-lg border-2 border-yellow-400">
           <h2 className="text-xl sm:text-2xl font-medium mb-5 text-gray-700">Chỉnh sửa Chuyên mục: <span className="font-bold">{editingName}</span></h2>
@@ -294,7 +285,6 @@ const AdminCategories: React.FC = () => {
         </form>
       )}
 
-      {/* List of Categories */}
       <div>
         <h2 className="text-xl sm:text-2xl font-medium mb-5 text-gray-700">Danh sách Chuyên mục ({categories.length})</h2>
         {isLoading && categories.length === 0 && <p className="text-gray-500">Đang tải chuyên mục...</p>}
@@ -327,7 +317,6 @@ const AdminCategories: React.FC = () => {
           </div>
         )}
 
-        {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="mt-8 flex justify-center items-center">
             <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1 || isLoading} className="mx-1 px-3 py-1 border rounded text-sm bg-white text-blue-500 hover:bg-blue-100 disabled:opacity-50">&laquo; Trước</button>
