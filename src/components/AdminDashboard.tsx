@@ -1,6 +1,7 @@
 // file: components/AdminDashboard.tsx
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import axios, { AxiosProgressEvent, AxiosError } from 'axios';
+import axios, { AxiosProgressEvent, AxiosError } from 'axios'; // Still needed for types and axios.isAxiosError
+import axiosInstance from '../lib/axiosInstance'; // Import axiosInstance
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 
@@ -66,7 +67,6 @@ const AdminDashboard: React.FC = () => {
   const [audioFile3, setAudioFile3] = useState<File | null>(null);
   const [audioFile4, setAudioFile4] = useState<File | null>(null);
 
-  // States for essay form submission and messages
   const [isSubmittingEssay, setIsSubmittingEssay] = useState<boolean>(false);
   const [formMessage, setFormMessage] = useState<string>('');
   const [formErrorDetails, setFormErrorDetails] = useState<string>('');
@@ -89,8 +89,8 @@ const AdminDashboard: React.FC = () => {
     setLoadingMeta(true);
     try {
       const [categoriesRes, topicsRes] = await Promise.all([
-        axios.get<Category[]>('http://localhost:5050/api/categories'),
-        axios.get<Topic[]>('http://localhost:5050/api/topics')
+        axiosInstance.get<Category[]>('/api/categories'), // Use axiosInstance
+        axiosInstance.get<Topic[]>('/api/topics')         // Use axiosInstance
       ]);
       const fetchedCategories = Array.isArray(categoriesRes.data) ? categoriesRes.data : [];
       setAllCategories([{ _id: 'Tất cả', name: 'Tất cả Chuyên mục' }, ...fetchedCategories]);
@@ -118,7 +118,7 @@ const AdminDashboard: React.FC = () => {
   const fetchEssays = useCallback(async () => {
     setLoadingEssays(true);
     try {
-      const response = await axios.get<Essay[]>('http://localhost:5050/api/essays');
+      const response = await axiosInstance.get<Essay[]>('/api/essays'); // Use axiosInstance
       setAllFetchedEssays(response.data.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
     } catch (error) {
       setFormMessage('Lỗi');
@@ -183,13 +183,11 @@ const AdminDashboard: React.FC = () => {
     } else {
       setSelectedCategoryInForm('');
     }
-    // selectedTopicForm sẽ được reset bởi useEffect của selectedCategoryInForm
-
     setAudioFile1(null); setAudioFile2(null); setAudioFile3(null); setAudioFile4(null);
     setEditingEssay(null);
-    setFormErrorDetails(''); setFormMessage(''); // Reset form messages
+    setFormErrorDetails(''); setFormMessage('');
     setUploadProgress(0);
-    setIsSubmittingEssay(false); // Ensure submitting state is reset
+    setIsSubmittingEssay(false);
     [audioFile1Ref, audioFile2Ref, audioFile3Ref, audioFile4Ref].forEach(ref => {
         if (ref.current) ref.current.value = '';
     });
@@ -235,8 +233,8 @@ const AdminDashboard: React.FC = () => {
     [audioFile1Ref, audioFile2Ref, audioFile3Ref, audioFile4Ref].forEach(ref => {
         if (ref.current) ref.current.value = '';
      });
-    setFormErrorDetails(''); setFormMessage(''); setUploadProgress(0); // Reset form messages
-    setIsSubmittingEssay(false); // Ensure not in submitting state when starting edit
+    setFormErrorDetails(''); setFormMessage(''); setUploadProgress(0);
+    setIsSubmittingEssay(false);
     const formElement = document.getElementById('essay-form-section');
     if (formElement) formElement.scrollIntoView({ behavior: 'smooth' });
   };
@@ -254,7 +252,7 @@ const AdminDashboard: React.FC = () => {
         setFormMessage('Lỗi'); setFormErrorDetails('Vui lòng chọn một chủ đề cho bài luận.'); return;
     }
 
-    setIsSubmittingEssay(true); // <<<< BẮT ĐẦU LOADING >>>>
+    setIsSubmittingEssay(true);
 
     const formData = new FormData();
     formData.append('title', title); formData.append('outline', outline);
@@ -275,17 +273,17 @@ const AdminDashboard: React.FC = () => {
       };
       const actionText = editingEssay ? 'Cập nhật' : 'Tạo mới';
       if (editingEssay) {
-        await axios.put(`http://localhost:5050/api/essays/${editingEssay._id}`, formData, config);
+        await axiosInstance.put(`/api/essays/${editingEssay._id}`, formData, config); // Use axiosInstance
       } else {
-        await axios.post('http://localhost:5050/api/essays/upload', formData, config);
+        await axiosInstance.post('/api/essays/upload', formData, config); // Use axiosInstance
       }
-      setFormMessage(`${actionText} bài luận thành công!`); // <<<< THÔNG BÁO THÀNH CÔNG >>>>
+      setFormMessage(`${actionText} bài luận thành công!`);
       resetForm();
       fetchEssays();
     } catch (error: unknown) {
       const actionText = editingEssay ? 'Cập nhật' : 'Tạo mới';
-      setFormMessage(`${actionText} bài luận thất bại!`); // <<<< THÔNG BÁO LỖI >>>>
-      if (axios.isAxiosError(error)) {
+      setFormMessage(`${actionText} bài luận thất bại!`);
+      if (axios.isAxiosError(error)) { // This check is still valid with axiosInstance errors
         const errData = error.response?.data as { error?: string };
         setFormErrorDetails(errData?.error || error.message || `Lỗi không xác định khi ${actionText.toLowerCase()} bài luận.`);
       }
@@ -293,11 +291,11 @@ const AdminDashboard: React.FC = () => {
       else { setFormErrorDetails(`Lỗi không xác định khi ${actionText.toLowerCase()} bài luận.`);}
       console.error(`Lỗi ${actionText.toLowerCase()} bài luận:`, error);
     } finally {
-      setIsSubmittingEssay(false); // <<<< DỪNG LOADING >>>>
+      setIsSubmittingEssay(false);
       setTimeout(() => {
-        setUploadProgress(0); // Reset progress bar sau khi hoàn thành (hoặc lỗi)
-      }, 1500); // Cho progress bar hiển thị 100% một chút
-      setTimeout(() => { // Tự động xóa message sau một khoảng thời gian
+        setUploadProgress(0);
+      }, 1500);
+      setTimeout(() => {
         setFormMessage('');
         setFormErrorDetails('');
       }, 7000);
@@ -306,39 +304,38 @@ const AdminDashboard: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     const essayToDelete = allFetchedEssays.find(e => e._id === id);
-    // <<<< HỘP THOẠI XÁC NHẬN >>>>
     const confirmDelete = window.confirm(
         `Bạn có chắc chắn muốn xóa bài luận "${essayToDelete?.title || 'này'}" không? \nHành động này không thể hoàn tác.`
     );
-    if (!confirmDelete) return; // Người dùng hủy
+    if (!confirmDelete) return;
 
-    setFormMessage(''); setFormErrorDetails(''); // Xóa các message cũ của form
+    setFormMessage(''); setFormErrorDetails('');
 
     try {
-      await axios.delete(`http://localhost:5050/api/essays/${id}`);
+      await axiosInstance.delete(`/api/essays/${id}`); // Use axiosInstance
       fetchEssays();
-      setFormMessage(`Đã xóa bài luận "${essayToDelete?.title || ''}" thành công.`); // <<<< THÔNG BÁO XÓA THÀNH CÔNG >>>>
+      setFormMessage(`Đã xóa bài luận "${essayToDelete?.title || ''}" thành công.`);
       if (editingEssay?._id === id) {
-        resetForm(); // Nếu đang sửa bài luận vừa xóa thì reset form
+        resetForm();
       }
     } catch (error) {
-        setFormMessage('Xóa bài luận thất bại!'); // <<<< THÔNG BÁO XÓA LỖI >>>>
-        if (axios.isAxiosError(error)) {
+        setFormMessage('Xóa bài luận thất bại!');
+        if (axios.isAxiosError(error)) { // This check is still valid
             const errData = error.response?.data as { error?: string };
             setFormErrorDetails(errData?.error || 'Lỗi không xác định khi xóa bài luận.');
         } else {
             setFormErrorDetails('Lỗi không xác định khi xóa bài luận.');
         }
     } finally {
-        setTimeout(() => { // Tự động xóa message sau một khoảng thời gian
+        setTimeout(() => {
             setFormMessage('');
             setFormErrorDetails('');
         }, 7000);
     }
   };
 
-  const startNewEssayMode = () => { 
-    resetForm(); 
+  const startNewEssayMode = () => {
+    resetForm();
     const formElement = document.getElementById('essay-form-section');
     if (formElement) formElement.scrollIntoView({ behavior: 'smooth' });
   };
@@ -456,7 +453,6 @@ const AdminDashboard: React.FC = () => {
       <h1 className="text-3xl font-bold mb-6 text-center text-yellow-400">Admin Dashboard - Quản lý Bài Luận</h1>
       {!editingEssay && ( <button onClick={startNewEssayMode} className="mb-6 py-2 px-4 rounded bg-indigo-500 hover:bg-indigo-600 text-white font-semibold shadow-lg transition-colors"> + Tạo Bài Luận Mới </button> )}
       
-      {/* Form Messages */}
       {formMessage && (
         <div
             className={`mb-4 p-3 rounded ${formErrorDetails || formMessage.includes('Lỗi') || formMessage.includes('thất bại') ?
@@ -472,8 +468,7 @@ const AdminDashboard: React.FC = () => {
             Chi tiết lỗi: {formErrorDetails}
         </div>
       )}
-      {/* Upload Progress Bar */}
-      {uploadProgress > 0 && uploadProgress < 100 && isSubmittingEssay && ( // Chỉ hiện progress khi isSubmittingEssay
+      {uploadProgress > 0 && uploadProgress < 100 && isSubmittingEssay && (
         <div className="w-full bg-gray-700 rounded-full mb-4 overflow-hidden border border-gray-600 shadow-inner">
             <div
                 className="bg-blue-500 text-xs font-bold text-white text-center p-1 leading-none rounded-full transition-all duration-300 ease-out"
@@ -484,7 +479,6 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Essay Form */}
       <form id="essay-form-section" onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg shadow-xl mb-8 border border-gray-700" encType="multipart/form-data" >
         <h2 className="text-2xl font-bold mb-6 text-yellow-400 border-b border-gray-700 pb-3"> {editingEssay ? `Chỉnh sửa: ${editingEssay.title}` : 'Tạo Bài Luận Mới'} </h2>
         
@@ -591,7 +585,6 @@ const AdminDashboard: React.FC = () => {
         </div>
       </form>
 
-      {/* Essay List Section */}
       <div id="admin-essay-list-section" className="mt-12">
         <h2 className="text-2xl font-bold mb-6 text-yellow-400 border-b border-gray-700 pb-3">Danh Sách Bài Luận Hiện Có ({adminDisplayedEssays.length})</h2>
         <div className="bg-gray-800 p-4 rounded-lg shadow-lg mb-6 border border-gray-700">
