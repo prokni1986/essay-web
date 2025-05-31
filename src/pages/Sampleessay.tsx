@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import axios from 'axios'; // Still needed for axios.isAxiosError
+import axiosInstance from '../lib/axiosInstance'; // Import axiosInstance
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
 
@@ -42,7 +43,8 @@ const SampleEssay: React.FC = () => {
       setLoading(true);
       setError('');
       try {
-        const response = await axios.get<Essay>(`http://localhost:5050/api/essays/${id}`);
+        // Use axiosInstance and relative path
+        const response = await axiosInstance.get<Essay>(`/api/essays/${id}`);
         setEssay(response.data);
 
         if (response.data.topic) {
@@ -65,7 +67,7 @@ const SampleEssay: React.FC = () => {
         }
       } catch (err) {
         console.error("Lỗi khi tải bài luận:", err);
-        if (axios.isAxiosError(err) && err.response?.status === 404) {
+        if (axios.isAxiosError(err) && err.response?.status === 404) { // axios.isAxiosError is still valid
             setError('Không tìm thấy bài luận được yêu cầu.');
         } else {
             setError('Không thể tải chi tiết bài luận. Vui lòng thử lại sau.');
@@ -79,8 +81,9 @@ const SampleEssay: React.FC = () => {
 
   useEffect(() => {
     if (topicId && (!topicName || (essay?.topic && typeof essay.topic === 'string' && essay.topic === topicId))) {
-      axios
-        .get<{ name: string }>(`http://localhost:5050/api/topics/${topicId}`)
+      // Use axiosInstance and relative path
+      axiosInstance
+        .get<{ name: string }>(`/api/topics/${topicId}`)
         .then(res => setTopicName(res.data.name || 'Chủ đề không tên'))
         .catch(() => {
             console.warn(`Không thể tải tên cho chủ đề ID: ${topicId}`);
@@ -219,7 +222,6 @@ const SampleEssay: React.FC = () => {
               )}
 
               <details className="essay-section" >
-                 {/* Thay đổi mb-4 thành mb-0 */}
                 <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
                   <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
                     <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
@@ -238,7 +240,6 @@ const SampleEssay: React.FC = () => {
 
               {essay.essay2 && (
                 <details className="essay-section">
-                  {/* Thay đổi mb-4 thành mb-0 */}
                   <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
                     <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
                         <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
@@ -258,7 +259,6 @@ const SampleEssay: React.FC = () => {
 
               {essay.essay3 && (
                 <details className="essay-section">
-                  {/* Thay đổi mb-4 thành mb-0 */}
                   <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
                      <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
                         <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
@@ -285,7 +285,7 @@ const SampleEssay: React.FC = () => {
         }
         
         .essay-section + .essay-section {
-            margin-top: 0.5rem; /* Đã thêm margin-top để tạo gap */
+            margin-top: 0.5rem;
             padding-top: 0; 
             border-top: none; 
         }
