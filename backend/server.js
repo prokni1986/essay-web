@@ -18,15 +18,14 @@ const app = express();
 const PORT = process.env.PORT || 5050;
 
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:8080'
+  process.env.FRONTEND_URL || 'http://localhost:8080','https://essay-web-1.onrender.com'
 ];
 const corsOptions = {
   origin: function (origin, callback) {
-    // Cho phép các request không có origin (ví dụ: từ Postman, curl, hoặc server-to-server)
-    // hoặc nếu origin nằm trong danh sách allowedOrigins
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+    if (!origin || allowedOrigins.some(allowed => origin.startsWith(allowed))) {
       callback(null, true);
     } else {
+      console.error('Blocked by CORS:', origin);
       callback(new Error('Not allowed by CORS'));
     }
   },
