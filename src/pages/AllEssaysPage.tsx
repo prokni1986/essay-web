@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import axios from 'axios';
+import axiosInstance from '../lib/axiosInstance'; // Import axiosInstance
 import { Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
 
-// Helpers (giữ nguyên)
+// Helpers
 const stripHtml = (html: string): string => {
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
@@ -16,10 +16,10 @@ const getFirstParagraph = (html: string): string => {
     return stripHtml(match[1]);
   }
   const plainText = stripHtml(html);
-  return plainText.substring(0, 180) + (plainText.length > 180 ? '...' : ''); 
+  return plainText.substring(0, 180) + (plainText.length > 180 ? '...' : '');
 };
 
-// Interfaces (giữ nguyên như phiên bản trước, giả định backend populate đầy đủ)
+// Interfaces
 interface Category {
   _id: string;
   name: string;
@@ -28,67 +28,67 @@ interface Category {
 interface Topic {
   _id: string;
   name: string;
-  category: Category; 
+  category: Category;
 }
 
 interface Essay {
   _id: string;
   title: string;
   content: string;
-  topic?: Topic | null; 
+  topic?: Topic | null;
   createdAt?: string;
 }
 
 interface GroupedEssays {
   categoryId: string;
   categoryName: string;
-  essays: Essay[]; 
-  topics: Topic[]; 
+  essays: Essay[];
+  topics: Topic[];
 }
 
 const AllEssaysPage: React.FC = () => {
   const [allFetchedEssays, setAllFetchedEssays] = useState<Essay[]>([]);
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [allTopics, setAllTopics] = useState<Topic[]>([]);
-  
+
   const [essaysGroupedByCategory, setEssaysGroupedByCategory] = useState<GroupedEssays[]>([]);
-  
+
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
-  const [searchTerms, setSearchTerms] = useState<Record<string, string>>({}); 
-  const [selectedTopicsInCategory, setSelectedTopicsInCategory] = useState<Record<string, string>>({}); 
+  const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
+  const [selectedTopicsInCategory, setSelectedTopicsInCategory] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchData = async () => {
       setLoadingData(true);
       setError(null);
       try {
+        // Use axiosInstance and relative paths
         const [essaysRes, categoriesRes, topicsRes] = await Promise.all([
-          axios.get<Essay[]>('http://localhost:5050/api/essays'), 
-          axios.get<Category[]>('http://localhost:5050/api/categories'),
-          axios.get<Topic[]>('http://localhost:5050/api/topics') 
+          axiosInstance.get<Essay[]>('/api/essays'),
+          axiosInstance.get<Category[]>('/api/categories'),
+          axiosInstance.get<Topic[]>('/api/topics')
         ]);
-        
-        setAllFetchedEssays(essaysRes.data.sort((a, b) => 
+
+        setAllFetchedEssays(essaysRes.data.sort((a, b) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
         ));
-        
+
         const sortedCategories = categoriesRes.data.sort((a,b) => a.name.localeCompare(b.name));
         setAllCategories(sortedCategories);
-        
-        setAllTopics(topicsRes.data); 
+
+        setAllTopics(topicsRes.data);
 
         const initialExpansionState: Record<string, boolean> = {};
         const initialSelectedTopics: Record<string, string> = {};
         const initialSearchTerms: Record<string, string> = {};
 
         sortedCategories.forEach((cat) => {
-          // <<<< THAY ĐỔI: MẶC ĐỊNH TẤT CẢ CATEGORY ĐỀU ĐÓNG >>>>
-          initialExpansionState[cat._id] = false; 
-          initialSelectedTopics[cat._id] = 'Tất cả'; 
-          initialSearchTerms[cat._id] = ''; 
+          initialExpansionState[cat._id] = false;
+          initialSelectedTopics[cat._id] = 'Tất cả';
+          initialSearchTerms[cat._id] = '';
         });
         setExpandedCategories(initialExpansionState);
         setSelectedTopicsInCategory(initialSelectedTopics);
@@ -105,13 +105,13 @@ const AllEssaysPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (loadingData || !allCategories.length) { 
+    if (loadingData || !allCategories.length) {
         setEssaysGroupedByCategory([]);
         return;
     }
 
     const grouped: GroupedEssays[] = allCategories.map(category => {
-      const essaysInThisCategory = allFetchedEssays.filter(essay => 
+      const essaysInThisCategory = allFetchedEssays.filter(essay =>
         essay.topic?.category?._id === category._id
       );
       const topicsInThisCategory = allTopics.filter(topic => {
@@ -163,7 +163,7 @@ const AllEssaysPage: React.FC = () => {
   }, [searchTerms, selectedTopicsInCategory]);
 
 
-  if (loadingData) { 
+  if (loadingData) {
     return (
       <Layout>
         <section className="py-10 px-4 text-center" style={{ background: "#23232b", minHeight: "100vh" }}>
@@ -178,7 +178,7 @@ const AllEssaysPage: React.FC = () => {
       </Layout>
     );
   }
-  if (error) { 
+  if (error) {
      return (
       <Layout>
         <section className="py-10 px-4 text-center" style={{ background: "#23232b", minHeight: "100vh" }}>
@@ -193,12 +193,12 @@ const AllEssaysPage: React.FC = () => {
       </Layout>
     );
   }
-  
+
   return (
     <Layout>
       <div style={{ background: "#23232b" }} className="min-h-screen py-8 px-4 md:px-0">
         <div className="max-w-5xl mx-auto">
-          <header className="text-center mb-12 py-6"> 
+          <header className="text-center mb-12 py-6">
             <h1 className="text-4xl md:text-5xl font-heading font-bold text-white">
               Thư viện <span style={{ color: "#fde047" }}>Bài luận</span>
             </h1>
@@ -222,14 +222,14 @@ const AllEssaysPage: React.FC = () => {
 
               return (
                 <section key={group.categoryId} aria-labelledby={`category-title-${group.categoryId}`} className="bg-[#1c1c22] p-4 sm:p-6 rounded-xl shadow-xl">
-                  <div 
+                  <div
                       onClick={() => handleToggleCategory(group.categoryId)}
                       className="flex justify-between items-center cursor-pointer group mb-3 sm:mb-4"
                       aria-expanded={isExpanded}
                       aria-controls={`category-content-${group.categoryId}`}
                   >
-                    <h2 
-                        id={`category-title-${group.categoryId}`} 
+                    <h2
+                        id={`category-title-${group.categoryId}`}
                         className="text-2xl sm:text-3xl font-bold text-yellow-400 group-hover:text-yellow-300 transition-colors duration-200"
                     >
                       {group.categoryName}
@@ -255,32 +255,31 @@ const AllEssaysPage: React.FC = () => {
                         />
                       </div>
 
-                      {/* <<<< THAY ĐỔI GIAO DIỆN TOPIC TABS >>>> */}
                       {group.topics.length > 0 && (
-                        <div className="mb-6"> 
+                        <div className="mb-6">
                           <p className="text-sm font-medium text-gray-400 mb-2">Lọc nhanh theo chủ đề:</p>
                           <div className="flex flex-wrap gap-2 items-center">
                             <button
                               onClick={() => handleSelectTopicInSection(group.categoryId, 'Tất cả')}
                               className={`py-2 px-4 rounded-lg text-sm font-semibold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1c1c22]
-                                ${currentSelectedTopicForSection === 'Tất cả' 
-                                  ? 'bg-yellow-500 text-gray-900 focus:ring-yellow-400' 
+                                ${currentSelectedTopicForSection === 'Tất cả'
+                                  ? 'bg-yellow-500 text-gray-900 focus:ring-yellow-400'
                                   : 'bg-[#2c2c34] text-gray-300 hover:bg-gray-600 focus:ring-gray-500'}`}
                             >
-                              Tất cả 
+                              Tất cả
                               <span className="ml-1.5 px-1.5 py-0.5 bg-gray-500/50 text-gray-300 text-xs rounded-full">
-                                {group.essays.filter(e => 
-                                    !currentSearchTermForSection || 
-                                    (e.title.toLowerCase().includes(currentSearchTermForSection) || 
+                                {group.essays.filter(e =>
+                                    !currentSearchTermForSection ||
+                                    (e.title.toLowerCase().includes(currentSearchTermForSection) ||
                                      stripHtml(e.content).toLowerCase().includes(currentSearchTermForSection))
                                 ).length}
                               </span>
                             </button>
                             {group.topics.map(topic => {
                                const essaysInTopic = group.essays.filter(e => e.topic?._id === topic._id);
-                               const essaysInTopicAfterSearch = essaysInTopic.filter(e => 
-                                    !currentSearchTermForSection || 
-                                    (e.title.toLowerCase().includes(currentSearchTermForSection) || 
+                               const essaysInTopicAfterSearch = essaysInTopic.filter(e =>
+                                    !currentSearchTermForSection ||
+                                    (e.title.toLowerCase().includes(currentSearchTermForSection) ||
                                      stripHtml(e.content).toLowerCase().includes(currentSearchTermForSection))
                                 );
                               return (
@@ -288,8 +287,8 @@ const AllEssaysPage: React.FC = () => {
                                   key={topic._id}
                                   onClick={() => handleSelectTopicInSection(group.categoryId, topic._id)}
                                   className={`py-2 px-4 rounded-lg text-sm font-semibold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1c1c22]
-                                    ${currentSelectedTopicForSection === topic._id 
-                                      ? 'bg-yellow-500 text-gray-900 focus:ring-yellow-400' 
+                                    ${currentSelectedTopicForSection === topic._id
+                                      ? 'bg-yellow-500 text-gray-900 focus:ring-yellow-400'
                                       : 'bg-[#2c2c34] text-gray-300 hover:bg-gray-600 focus:ring-gray-500'}`}
                                 >
                                   {topic.name}
@@ -302,12 +301,12 @@ const AllEssaysPage: React.FC = () => {
                           </div>
                         </div>
                       )}
-                      
+
                       {essaysToDisplay.length > 0 ? (
                         <div className="space-y-6">
                           {essaysToDisplay.map((essay) => (
-                            <div 
-                              key={essay._id} 
+                            <div
+                              key={essay._id}
                               className="bg-[#18181B] p-5 rounded-xl shadow-xl transition-all duration-300 hover:shadow-yellow-500/20 hover:ring-1 hover:ring-yellow-500/50 group hover:-translate-y-1"
                             >
                               <h3 className="text-xl sm:text-2xl font-bold text-white group-hover:text-yellow-400 transition-colors duration-200 mb-2">
@@ -318,7 +317,7 @@ const AllEssaysPage: React.FC = () => {
                               </p>
                                <p className="text-xs text-gray-500 mb-3">
                                 Chuyên mục: <span className="font-medium text-gray-400">
-                                  {essay.topic?.category?.name || 'Không rõ'} 
+                                  {essay.topic?.category?.name || 'Không rõ'}
                                 </span>
                               </p>
                               <p className="text-gray-300 leading-relaxed mb-4 text-sm sm:text-base">
@@ -355,7 +354,6 @@ const AllEssaysPage: React.FC = () => {
           .animate-fadeIn {
             animation: fadeIn 0.3s ease-out;
           }
-          /* Bỏ custom scrollbar cho nav vì giờ là các nút */
         `}
       </style>
     </Layout>
