@@ -1,0 +1,74 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 15%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 60 100% 68%;
+    --primary-foreground: 0 0% 5%;
+
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 20%;
+    --muted-foreground: 0 0% 75%;
+
+    --accent: 0 0% 20%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 80%;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-dark text-light font-sans;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-medium;
+  }
+
+  /* Dethianh.com-style link animation */
+  .nav-link {
+    @apply relative inline-block;
+  }
+
+  .nav-link::after {
+    content: '';
+    @apply absolute w-0 h-[1px] bg-highlight left-0 -bottom-1 transition-all duration-300;
+  }
+
+  .nav-link:hover::after {
+    @apply w-full;
+  }
+
+  .section {
+    @apply py-24 px-6 md:px-10 max-w-7xl mx-auto;
+  }
+
+  .highlight {
+    @apply text-highlight;
+  }
+}
