@@ -1,18 +1,19 @@
 // file: components/AdminTopics.tsx
 import React, { useEffect, useState, ChangeEvent, FormEvent, useCallback } from 'react';
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError } from 'axios'; // Still needed for types and axios.isAxiosError
+import axiosInstance from '../lib/axiosInstance'; // <<--- CORRECT: Uses axiosInstance
 
 type Topic = {
   _id: string;
   name: string;
   imageUrl?: string;
-  category?: { // Category có thể là object đầy đủ từ populate
+  category?: {
     _id: string;
     name: string;
-  } | string; // Hoặc chỉ là ID nếu không populate
+  } | string;
 };
 
-type CategoryType = { // Dùng cho danh sách categories fetched cho form
+type CategoryType = {
   _id: string;
   name: string;
 };
@@ -21,19 +22,21 @@ interface ApiErrorResponse {
   error: string;
 }
 
-const TOPICS_PER_PAGE = 6; 
+const TOPICS_PER_PAGE = 6;
+
+// Define API paths relative to the baseURL in axiosInstance
+const API_TOPICS_PATH = '/api/topics';           // <<--- CORRECT: Relative path
+const API_CATEGORIES_PATH = '/api/categories';   // <<--- CORRECT: Relative path
 
 const AdminTopics: React.FC = () => {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [categories, setCategories] = useState<CategoryType[]>([]);
 
-  // States cho form thêm mới
   const [newTopicName, setNewTopicName] = useState<string>('');
   const [newTopicImageFile, setNewTopicImageFile] = useState<File | null>(null);
   const [newTopicImagePreview, setNewTopicImagePreview] = useState<string | null>(null);
   const [newTopicCategoryId, setNewTopicCategoryId] = useState<string>('');
 
-  // States cho form chỉnh sửa
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState<string>('');
   const [editingImageFile, setEditingImageFile] = useState<File | null>(null);
@@ -41,41 +44,34 @@ const AdminTopics: React.FC = () => {
   const [currentEditingImageUrl, setCurrentEditingImageUrl] = useState<string | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<string>('');
 
-  // States cho loading và messages
-  const [isUploading, setIsUploading] = useState<boolean>(false); // Loading khi thêm mới
-  const [uploadMessage, setUploadMessage] = useState<string>('');   // Message cho thêm mới
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadMessage, setUploadMessage] = useState<string>('');
 
-  const [isEditing, setIsEditing] = useState<boolean>(false);       // Loading khi sửa
-  const [editMessage, setEditMessage] = useState<string>('');         // Message cho sửa
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editMessage, setEditMessage] = useState<string>('');
 
-  const [generalMessage, setGeneralMessage] = useState<string>(''); // Message chung (ví dụ: xóa thành công)
-  const [errorMessage, setErrorMessage] = useState<string>('');     // Message lỗi chung
+  const [generalMessage, setGeneralMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // State phân trang
   const [currentPage, setCurrentPage] = useState<number>(1);
 
-  const API_TOPICS_URL = 'http://localhost:5050/api/topics';
-  const API_CATEGORIES_URL = 'http://localhost:5050/api/categories';
-
-  // Fetch topics
   const fetchTopics = useCallback(async () => {
     try {
-      const res = await axios.get<Topic[]>(API_TOPICS_URL);
+      // Uses axiosInstance and relative path
+      const res = await axiosInstance.get<Topic[]>(API_TOPICS_PATH);
       setTopics(Array.isArray(res.data) ? res.data : []);
-      // Không reset currentPage ở đây để giữ trang hiện tại sau khi edit/delete
     } catch (err) {
       console.error("Lỗi khi tải danh sách chủ đề:", err);
       setErrorMessage("Không thể tải danh sách chủ đề. Vui lòng thử lại sau.");
     }
-  }, [API_TOPICS_URL]);
+  }, []); // Removed API_TOPICS_URL from dependencies as it's a constant path now
 
-  // Fetch categories cho dropdowns
   const fetchCategoriesForForm = useCallback(async () => {
     try {
-      const res = await axios.get<CategoryType[]>(API_CATEGORIES_URL);
+      // Uses axiosInstance and relative path
+      const res = await axiosInstance.get<CategoryType[]>(API_CATEGORIES_PATH);
       const fetchedCategories = Array.isArray(res.data) ? res.data : [];
       setCategories(fetchedCategories);
-      // Set category mặc định cho form "Thêm mới" nếu chưa có topic nào đang được edit
       if (fetchedCategories.length > 0 && !editingId) {
         if (!newTopicCategoryId || !fetchedCategories.find(cat => cat._id === newTopicCategoryId)) {
           setNewTopicCategoryId(fetchedCategories[0]._id);
@@ -85,13 +81,12 @@ const AdminTopics: React.FC = () => {
       console.error("Lỗi khi tải danh sách chuyên mục:", err);
       setErrorMessage("Không thể tải danh sách chuyên mục cho form.");
     }
-  }, [API_CATEGORIES_URL, editingId, newTopicCategoryId]);
+  }, [editingId, newTopicCategoryId]); // Removed API_CATEGORIES_URL
 
   useEffect(() => {
     fetchTopics();
     fetchCategoriesForForm();
   }, [fetchTopics, fetchCategoriesForForm]);
-
 
   const handleFileChange = (
     event: ChangeEvent<HTMLInputElement>,
@@ -118,14 +113,12 @@ const AdminTopics: React.FC = () => {
     setNewTopicImageFile(null);
     setNewTopicImagePreview(null);
     setNewTopicCategoryId(categories.length > 0 ? categories[0]._id : '');
-    // Clear file input
     const fileInput = document.getElementById('newTopicImage') as HTMLInputElement;
     if (fileInput) fileInput.value = "";
   };
 
   const handleAddTopic = async (e: FormEvent) => {
     e.preventDefault();
-    // Xóa các message cũ
     setUploadMessage(''); setEditMessage(''); setGeneralMessage(''); setErrorMessage('');
 
     if (!newTopicName.trim()) {
@@ -139,7 +132,7 @@ const AdminTopics: React.FC = () => {
         return;
     }
 
-    setIsUploading(true); // Bắt đầu loading
+    setIsUploading(true);
 
     const formData = new FormData();
     formData.append('name', newTopicName.trim());
@@ -149,13 +142,14 @@ const AdminTopics: React.FC = () => {
     }
 
     try {
-      await axios.post(API_TOPICS_URL, formData, {
+      // Uses axiosInstance and relative path
+      await axiosInstance.post(API_TOPICS_PATH, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setUploadMessage('Thêm chủ đề thành công!');
       resetAddForm();
-      await fetchTopics(); // Tải lại danh sách topics
-      setCurrentPage(1); // Quay về trang đầu sau khi thêm mới
+      await fetchTopics();
+      setCurrentPage(1);
     } catch (error) {
       console.error("Lỗi khi thêm chủ đề:", error);
       let errMsg = 'Lỗi không xác định khi thêm chủ đề.';
@@ -163,11 +157,11 @@ const AdminTopics: React.FC = () => {
         const serverError = error.response?.data as ApiErrorResponse;
         errMsg = serverError?.error || error.message;
       } else if (error instanceof Error) { errMsg = error.message; }
-      setUploadMessage(''); // Xóa message loading/thành công nếu có
+      setUploadMessage('');
       setErrorMessage(`Thêm thất bại: ${errMsg}`);
     } finally {
-      setIsUploading(false); // Dừng loading
-      setTimeout(() => { // Xóa message sau một khoảng thời gian
+      setIsUploading(false);
+      setTimeout(() => {
         setUploadMessage('');
         setErrorMessage('');
       }, 5000);
@@ -177,21 +171,18 @@ const AdminTopics: React.FC = () => {
   const startEdit = (topic: Topic) => {
     setEditingId(topic._id);
     setEditingName(topic.name);
-    setEditingImageFile(null); // Reset file chọn mới
+    setEditingImageFile(null);
     setCurrentEditingImageUrl(topic.imageUrl || null);
-    setEditingImagePreview(topic.imageUrl || null); // Hiển thị ảnh hiện tại (nếu có)
+    setEditingImagePreview(topic.imageUrl || null);
 
-    // Set category cho form edit
-    if (topic.category && typeof topic.category === 'object') { // Nếu category đã được populate
+    if (topic.category && typeof topic.category === 'object') {
         setEditingCategoryId(topic.category._id);
-    } else if (typeof topic.category === 'string') { // Nếu category là ID
+    } else if (typeof topic.category === 'string') {
         setEditingCategoryId(topic.category);
-    } else { // Fallback nếu không có category
+    } else {
         setEditingCategoryId(categories.length > 0 ? categories[0]._id : '');
     }
-    // Xóa các message cũ
     setUploadMessage(''); setEditMessage(''); setGeneralMessage(''); setErrorMessage('');
-    // Scroll to form edit (nếu cần)
     const editFormElement = document.getElementById('edit-topic-form');
     if (editFormElement) editFormElement.scrollIntoView({ behavior: 'smooth' });
   };
@@ -202,14 +193,13 @@ const AdminTopics: React.FC = () => {
     setEditingImageFile(null);
     setEditingImagePreview(null);
     setCurrentEditingImageUrl(null);
-    setEditingCategoryId(categories.length > 0 ? categories[0]._id : ''); // Reset category
-    setIsEditing(false); // Đảm bảo trạng thái loading của edit tắt
-    setEditMessage(''); // Xóa message của form edit
+    setEditingCategoryId(categories.length > 0 ? categories[0]._id : '');
+    setIsEditing(false);
+    setEditMessage('');
   };
 
   const handleEditTopic = async (e: FormEvent) => {
     e.preventDefault();
-    // Xóa các message cũ
     setUploadMessage(''); setEditMessage(''); setGeneralMessage(''); setErrorMessage('');
 
     if (!editingName.trim() || !editingId) {
@@ -223,29 +213,25 @@ const AdminTopics: React.FC = () => {
         return;
     }
 
-    setIsEditing(true); // Bắt đầu loading
+    setIsEditing(true);
 
     const formData = new FormData();
     formData.append('name', editingName.trim());
     formData.append('categoryId', editingCategoryId);
-    if (editingImageFile) { // Nếu có file ảnh mới được chọn
+    if (editingImageFile) {
       formData.append('image', editingImageFile);
     } else if (!editingImagePreview && currentEditingImageUrl) {
-      // Nếu ảnh preview bị xóa (editingImagePreview = null) và có ảnh cũ (currentEditingImageUrl)
-      // thì báo backend xóa ảnh hiện tại
       formData.append('removeCurrentImage', 'true');
     }
-    // Nếu editingImagePreview không null và bằng currentEditingImageUrl, và không có editingImageFile
-    // thì không cần gửi gì liên quan đến ảnh, backend sẽ giữ nguyên ảnh cũ.
 
     try {
-      await axios.put(`${API_TOPICS_URL}/${editingId}`, formData, {
+      // Uses axiosInstance and relative path
+      await axiosInstance.put(`${API_TOPICS_PATH}/${editingId}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setEditMessage('Cập nhật chủ đề thành công!');
-      await fetchTopics(); // Tải lại danh sách topics
-      // Không reset page, giữ nguyên page hiện tại
-      setTimeout(() => { cancelEdit(); }, 2000); // Đóng form edit sau 2s
+      await fetchTopics();
+      setTimeout(() => { cancelEdit(); }, 2000);
     } catch (error) {
       console.error("Lỗi khi sửa chủ đề:", error);
       let errMsg = 'Lỗi không xác định khi sửa chủ đề.';
@@ -253,43 +239,38 @@ const AdminTopics: React.FC = () => {
         const serverError = error.response?.data as ApiErrorResponse;
         errMsg = serverError?.error || error.message;
       } else if (error instanceof Error) { errMsg = error.message; }
-      setEditMessage(''); // Xóa message loading/thành công nếu có
+      setEditMessage('');
       setErrorMessage(`Sửa thất bại: ${errMsg}`);
-      setIsEditing(false); // Dừng loading nếu có lỗi mà không đóng form
-      setTimeout(() => { // Xóa message lỗi sau một khoảng thời gian
+      setIsEditing(false);
+      setTimeout(() => {
         setErrorMessage('');
       }, 5000);
     }
-    // setIsEditing(false) sẽ được gọi trong cancelEdit() nếu thành công, hoặc ở trên nếu lỗi.
   };
 
   const handleDelete = async (id: string) => {
     const topicToDelete = topics.find(t => t._id === id);
-    // <<<< HỎI LẠI NGƯỜI DÙNG >>>>
     const confirmDelete = window.confirm(
       `Bạn có chắc chắn muốn xóa chủ đề "${topicToDelete?.name || id}" không? \nLưu ý: Hình ảnh của chủ đề (nếu có) cũng sẽ bị xóa vĩnh viễn.`
     );
 
-    if (!confirmDelete) {
-      return; // Người dùng hủy
-    }
+    if (!confirmDelete) return;
 
-    // Xóa các message cũ
     setUploadMessage(''); setEditMessage(''); setGeneralMessage(''); setErrorMessage('');
 
     try {
-      await axios.delete(`${API_TOPICS_URL}/${id}`);
+      // Uses axiosInstance and relative path
+      await axiosInstance.delete(`${API_TOPICS_PATH}/${id}`);
       setGeneralMessage(`Đã xóa chủ đề "${topicToDelete?.name || 'đã chọn'}" thành công.`);
-      await fetchTopics(); // Tải lại danh sách
-      // Nếu topic đang được edit bị xóa, thì cancel edit mode
+      await fetchTopics();
       if (editingId === id) {
         cancelEdit();
       }
-      // Kiểm tra nếu trang hiện tại trở nên rỗng sau khi xóa
-      if (currentTopics.length === 1 && currentPage > 1) {
+      if (currentTopics.length === 1 && currentPage > 1 && topics.length > 1) {
         setCurrentPage(currentPage - 1);
+      } else if (topics.length === 1 && currentTopics.length === 1) {
+        setCurrentPage(1);
       }
-
     } catch (error) {
       console.error("Lỗi khi xóa chủ đề:", error);
       let errMsg = 'Lỗi không xác định khi xóa chủ đề.';
@@ -299,18 +280,16 @@ const AdminTopics: React.FC = () => {
       } else if (error instanceof Error) { errMsg = error.message; }
       setErrorMessage(`Xóa thất bại: ${errMsg}`);
     } finally {
-        setTimeout(() => { // Xóa message sau một khoảng thời gian
+        setTimeout(() => {
             setGeneralMessage('');
             setErrorMessage('');
         }, 5000);
     }
   };
 
-  // Helper lấy tên category (nếu có)
   const getCategoryName = (categoryData?: CategoryType | string | null): string => {
     if (!categoryData) return 'Chưa có';
     if (typeof categoryData === 'object' && categoryData.name) return categoryData.name;
-    // Trường hợp categoryData là string (ID), tìm trong mảng categories đã fetch
     if (typeof categoryData === 'string') {
         const foundCat = categories.find(c => c._id === categoryData);
         return foundCat ? foundCat.name : 'Không xác định';
@@ -318,7 +297,6 @@ const AdminTopics: React.FC = () => {
     return 'Không xác định';
   };
 
-  // Logic phân trang
   const indexOfLastTopic = currentPage * TOPICS_PER_PAGE;
   const indexOfFirstTopic = indexOfLastTopic - TOPICS_PER_PAGE;
   const currentTopics = topics.slice(indexOfFirstTopic, indexOfLastTopic);
@@ -333,84 +311,41 @@ const AdminTopics: React.FC = () => {
   const renderPageNumbers = () => {
     const pageNumbers = [];
     if (totalPages <= 1) return null;
-
-    const maxPageButtons = 3; 
+    const maxPageButtons = 3;
     let startPage: number, endPage: number;
 
-    if (totalPages <= maxPageButtons) {
-      startPage = 1;
-      endPage = totalPages;
-    } else {
+    if (totalPages <= maxPageButtons) { startPage = 1; endPage = totalPages; }
+    else {
       const maxPagesBeforeCurrentPage = Math.floor(maxPageButtons / 2);
       const maxPagesAfterCurrentPage = Math.ceil(maxPageButtons / 2) - 1;
-      if (currentPage <= maxPagesBeforeCurrentPage) {
-        startPage = 1;
-        endPage = maxPageButtons;
-      } else if (currentPage + maxPagesAfterCurrentPage >= totalPages) {
-        startPage = totalPages - maxPageButtons + 1;
-        endPage = totalPages;
-      } else {
-        startPage = currentPage - maxPagesBeforeCurrentPage;
-        endPage = currentPage + maxPagesAfterCurrentPage;
-      }
+      if (currentPage <= maxPagesBeforeCurrentPage) { startPage = 1; endPage = maxPageButtons; }
+      else if (currentPage + maxPagesAfterCurrentPage >= totalPages) { startPage = totalPages - maxPageButtons + 1; endPage = totalPages; }
+      else { startPage = currentPage - maxPagesBeforeCurrentPage; endPage = currentPage + maxPagesAfterCurrentPage; }
     }
-
-    if (startPage > 1) {
-      pageNumbers.push(
-        <button key={1} onClick={() => paginate(1)} className="mx-1 px-3 py-1 border rounded text-sm bg-white text-blue-500 hover:bg-blue-100">1</button>
-      );
-      if (startPage > 2) {
-        pageNumbers.push(<span key="start-ellipsis" className="py-2 px-4 mx-1 text-gray-400">...</span>);
-      }
-    }
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(
-        <button
-          key={i}
-          onClick={() => paginate(i)}
-          className={`mx-1 px-3 py-1 border rounded text-sm ${
-            currentPage === i ? 'bg-blue-500 text-white' : 'bg-white text-blue-500 hover:bg-blue-100'
-          }`}
-        >
-          {i}
-        </button>
-      );
-    }
-
-    if (endPage < totalPages) {
-      if (endPage < totalPages - 1) {
-        pageNumbers.push(<span key="end-ellipsis" className="py-2 px-4 mx-1 text-gray-400">...</span>);
-      }
-      pageNumbers.push(
-        <button key={totalPages} onClick={() => paginate(totalPages)} className="mx-1 px-3 py-1 border rounded text-sm bg-white text-blue-500 hover:bg-blue-100">{totalPages}</button>
-      );
-    }
+    if (startPage > 1) { pageNumbers.push( <button key={1} onClick={() => paginate(1)} className="mx-1 px-3 py-1 border rounded text-sm bg-white text-blue-500 hover:bg-blue-100">1</button> ); if (startPage > 2) { pageNumbers.push(<span key="start-ellipsis" className="py-2 px-4 mx-1 text-gray-400">...</span>); } }
+    for (let i = startPage; i <= endPage; i++) { pageNumbers.push( <button key={i} onClick={() => paginate(i)} className={`mx-1 px-3 py-1 border rounded text-sm ${ currentPage === i ? 'bg-blue-500 text-white' : 'bg-white text-blue-500 hover:bg-blue-100' }`} > {i} </button> ); }
+    if (endPage < totalPages) { if (endPage < totalPages - 1) { pageNumbers.push(<span key="end-ellipsis" className="py-2 px-4 mx-1 text-gray-400">...</span>); } pageNumbers.push( <button key={totalPages} onClick={() => paginate(totalPages)} className="mx-1 px-3 py-1 border rounded text-sm bg-white text-blue-500 hover:bg-blue-100">{totalPages}</button> ); }
     return pageNumbers;
   };
-
-
+  // JSX for rendering the component (forms, list, pagination) remains the same
+  // ... (rest of the return statement from your original AdminTopics.tsx) ...
   return (
     <div className="p-4 sm:p-6 max-w-4xl mx-auto bg-gray-50 min-h-screen">
       <h1 className="text-2xl sm:text-3xl font-semibold mb-6 sm:mb-8 text-center text-gray-800">Quản lý Chủ đề (Topics)</h1>
 
-      {/* Khu vực hiển thị message chung */}
       {generalMessage && <div className="mb-4 p-3 rounded bg-blue-100 text-blue-700 border border-blue-300 text-center">{generalMessage}</div>}
       {errorMessage && <div className="mb-4 p-3 rounded bg-red-100 text-red-700 border border-red-300 text-center">{errorMessage}</div>}
 
-      {/* Form thêm mới Topic (chỉ hiển thị khi không có topic nào đang được sửa) */}
       {!editingId && (
         <form onSubmit={handleAddTopic} className="mb-8 sm:mb-10 p-5 sm:p-6 bg-white shadow-xl rounded-lg">
           <h2 className="text-xl sm:text-2xl font-medium mb-5 sm:mb-6 text-gray-700">
             Thêm Chủ đề mới
           </h2>
-           {/* Message cho form thêm mới */}
           {uploadMessage && (
             <p className={`mb-3 p-2 text-sm rounded ${uploadMessage.includes('thất bại') || uploadMessage.includes('Lỗi:') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
               {uploadMessage}
             </p>
           )}
-          {/* Chọn Chuyên mục Cha */}
           <div className="mb-4 sm:mb-5">
             <label htmlFor="newTopicCategoryId" className="block text-sm font-medium text-gray-600 mb-1">
               Thuộc Chuyên mục (Category):<span className="text-red-500">*</span>
@@ -427,7 +362,6 @@ const AdminTopics: React.FC = () => {
               {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
             </select>
           </div>
-          {/* Tên chủ đề */}
           <div className="mb-4 sm:mb-5">
             <label htmlFor="newTopicName" className="block text-sm font-medium text-gray-600 mb-1">
               Tên chủ đề:<span className="text-red-500">*</span>
@@ -440,20 +374,18 @@ const AdminTopics: React.FC = () => {
               disabled={isUploading} required
             />
           </div>
-          {/* Hình ảnh chủ đề */}
           <div className="mb-4 sm:mb-5">
             <label htmlFor="newTopicImage" className="block text-sm font-medium text-gray-600 mb-1">
               Hình ảnh chủ đề (tùy chọn):
             </label>
             <input
               id="newTopicImage" type="file" accept="image/*"
-              key={newTopicImageFile?.name || 'newFileKeyAddForm'} // Key để reset input file
+              key={newTopicImageFile?.name || 'newFileKeyAddForm'}
               onChange={(e) => handleFileChange(e, setNewTopicImageFile, setNewTopicImagePreview)}
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
               disabled={isUploading}
             />
           </div>
-          {/* Xem trước ảnh */}
           {newTopicImagePreview && (
             <div className="mb-4 sm:mb-5">
               <p className="text-xs text-gray-500 mb-1">Xem trước:</p>
@@ -468,7 +400,7 @@ const AdminTopics: React.FC = () => {
                         if (isUploading) return;
                         setNewTopicImagePreview(null); setNewTopicImageFile(null);
                         const fileInput = document.getElementById('newTopicImage') as HTMLInputElement;
-                        if (fileInput) fileInput.value = ""; // Reset input file
+                        if (fileInput) fileInput.value = "";
                     }}
                     disabled={isUploading}
                     className="absolute top-0 right-0 mt-1 mr-1 bg-red-500 text-white rounded-full p-1 text-xs leading-none hover:bg-red-600 disabled:opacity-50"
@@ -477,9 +409,8 @@ const AdminTopics: React.FC = () => {
             </div>
             </div>
           )}
-          {/* Nút Submit */}
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isUploading || categories.length === 0}
             className="w-full font-medium py-2.5 px-5 rounded-lg text-white transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed"
           >
@@ -488,19 +419,16 @@ const AdminTopics: React.FC = () => {
         </form>
       )}
 
-      {/* Form chỉnh sửa Topic (chỉ hiển thị khi có editingId) */}
       {editingId && (
         <form id="edit-topic-form" onSubmit={handleEditTopic} className="mb-8 sm:mb-10 p-5 sm:p-6 bg-white shadow-xl rounded-lg border-2 border-yellow-400">
           <h2 className="text-xl sm:text-2xl font-medium mb-5 sm:mb-6 text-gray-700">
             Chỉnh sửa Chủ đề: <span className="font-bold">{editingName}</span>
           </h2>
-          {/* Message cho form sửa */}
           {editMessage && (
             <p className={`mb-3 p-2 text-sm rounded ${editMessage.includes('thất bại') || editMessage.includes('Lỗi:') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
               {editMessage}
             </p>
           )}
-          {/* Chọn Chuyên mục Cha */}
           <div className="mb-4 sm:mb-5">
             <label htmlFor="editingCategoryId" className="block text-sm font-medium text-gray-600 mb-1">
               Thuộc Chuyên mục (Category):<span className="text-red-500">*</span>
@@ -517,7 +445,6 @@ const AdminTopics: React.FC = () => {
               {categories.map(cat => <option key={cat._id} value={cat._id}>{cat.name}</option>)}
             </select>
           </div>
-          {/* Tên chủ đề */}
           <div className="mb-4 sm:mb-5">
             <label htmlFor="editingTopicName" className="block text-sm font-medium text-gray-600 mb-1">
               Tên chủ đề:<span className="text-red-500">*</span>
@@ -530,20 +457,18 @@ const AdminTopics: React.FC = () => {
               disabled={isEditing} required
             />
           </div>
-          {/* Thay đổi hình ảnh */}
           <div className="mb-4 sm:mb-5">
             <label htmlFor="editingTopicImage" className="block text-sm font-medium text-gray-600 mb-1">
               Thay đổi hình ảnh (tùy chọn):
             </label>
             <input
               id="editingTopicImage" type="file" accept="image/*"
-              key={editingImageFile?.name || 'editFileKeyForm'} // Key để reset input file
+              key={editingImageFile?.name || 'editFileKeyForm'}
               onChange={(e) => handleFileChange(e, setEditingImageFile, setEditingImagePreview)}
               className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-50 file:text-yellow-700 hover:file:bg-yellow-100 cursor-pointer"
               disabled={isEditing}
             />
           </div>
-          {/* Xem trước ảnh (kể cả ảnh cũ hoặc ảnh mới chọn) */}
           {editingImagePreview && (
             <div className="mb-4 sm:mb-5">
               <p className="text-xs text-gray-500 mb-1">Xem trước:</p>
@@ -556,10 +481,10 @@ const AdminTopics: React.FC = () => {
                   type="button"
                   onClick={() => {
                       if (isEditing) return;
-                      setEditingImagePreview(null); // Xóa preview -> báo hiệu xóa ảnh nếu lưu
-                      setEditingImageFile(null);    // Xóa file mới chọn (nếu có)
+                      setEditingImagePreview(null);
+                      setEditingImageFile(null);
                       const fileInput = document.getElementById('editingTopicImage') as HTMLInputElement;
-                      if (fileInput) fileInput.value = ""; // Reset input file
+                      if (fileInput) fileInput.value = "";
                   }}
                   disabled={isEditing}
                   className="absolute top-0 right-0 mt-1 mr-1 bg-red-500 text-white rounded-full p-1 text-xs leading-none hover:bg-red-600 disabled:opacity-50"
@@ -568,17 +493,16 @@ const AdminTopics: React.FC = () => {
               </div>
             </div>
           )}
-          {/* Nút Submit và Hủy */}
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={isEditing || categories.length === 0}
               className="w-full font-medium py-2.5 px-5 rounded-lg text-white transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 bg-green-500 hover:bg-green-600 focus:ring-green-500 disabled:bg-green-300 disabled:cursor-not-allowed"
             >
               {isEditing ? 'Đang lưu...' : (categories.length === 0 ? 'Hãy chọn Chuyên mục' : 'Lưu Thay đổi')}
             </button>
-            <button 
-              type="button" onClick={cancelEdit} 
+            <button
+              type="button" onClick={cancelEdit}
               disabled={isEditing}
               className="w-full bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2.5 px-5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50"
             >
@@ -588,12 +512,11 @@ const AdminTopics: React.FC = () => {
         </form>
       )}
 
-      {/* Danh sách Chủ đề */}
       <div>
         <h2 className="text-xl sm:text-2xl font-medium mb-5 sm:mb-6 text-gray-700">
           Danh sách Chủ đề ({topics.length})
         </h2>
-        {topics.length === 0 && !editingId && !errorMessage && ( // Chỉ hiển thị "Không có chủ đề" nếu không có lỗi và không đang edit
+        {topics.length === 0 && !editingId && !errorMessage && (
           <p className="text-gray-500 text-center py-4 bg-white rounded-md shadow">
             Không có chủ đề nào. Hãy thêm một chủ đề mới.
           </p>
@@ -603,9 +526,9 @@ const AdminTopics: React.FC = () => {
             {currentTopics.map((topic) => (
               <div
                 key={topic._id}
-                className="p-3 sm:p-4 bg-white shadow-lg rounded-lg flex flex-col" // justify-between đã bị xóa, dùng flex-col để nút ở dưới
+                className="p-3 sm:p-4 bg-white shadow-lg rounded-lg flex flex-col"
               >
-                <div className="flex items-start mb-2 flex-grow min-w-0"> {/* items-start để text và ảnh align top */}
+                <div className="flex items-start mb-2 flex-grow min-w-0">
                   {topic.imageUrl && (
                     <img
                       src={topic.imageUrl} alt={topic.name}
@@ -616,26 +539,24 @@ const AdminTopics: React.FC = () => {
                       }}
                     />
                   )}
-                  <div className="flex-grow overflow-hidden"> {/* Cho phép text co giãn và ẩn nếu quá dài */}
+                  <div className="flex-grow overflow-hidden">
                     <span className="text-md sm:text-lg font-medium text-gray-800 block truncate" title={topic.name}>
                         {topic.name}
                     </span>
-                    {/* Hiển thị tên Category */}
                     <span className="text-xs text-indigo-600 block mt-1">
                         Chuyên mục: {getCategoryName(topic.category)}
                     </span>
                   </div>
                 </div>
-                {/* Các nút Sửa/Xóa sẽ được đẩy xuống dưới cùng bằng mt-auto trên div cha của chúng */}
-                <div className="flex space-x-2 self-end flex-shrink-0 mt-auto pt-2"> {/* mt-auto để đẩy xuống, pt-2 để có khoảng cách */}
+                <div className="flex space-x-2 self-end flex-shrink-0 mt-auto pt-2">
                   <button
                     onClick={() => startEdit(topic)}
-                    disabled={isEditing && editingId === topic._id} // Vô hiệu hóa nếu đang sửa chính nó
+                    disabled={isEditing && editingId === topic._id}
                     className="py-1 px-3 sm:py-1.5 sm:px-4 text-xs sm:text-sm font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-md transition-colors disabled:opacity-50"
                   >Sửa</button>
                   <button
                     onClick={() => handleDelete(topic._id)}
-                    disabled={isUploading || isEditing} // Vô hiệu hóa nút xóa khi đang có hành động upload/edit khác
+                    disabled={isUploading || isEditing}
                     className="py-1 px-3 sm:py-1.5 sm:px-4 text-xs sm:text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-md transition-colors disabled:opacity-50"
                   >Xoá</button>
                 </div>
@@ -644,7 +565,6 @@ const AdminTopics: React.FC = () => {
           </div>
         )}
 
-        {/* Phân trang */}
         {totalPages > 1 && (
           <div className="mt-8 flex justify-center items-center">
             <button
