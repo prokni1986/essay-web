@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { cn } from "@/lib/utils";
-import axios from 'axios';
+// Xóa: import axios from 'axios';
+import axiosInstance from '../lib/axiosInstance'; // <<<< THÊM IMPORT AXIOSINSTANCE
 
 interface Category {
   _id: string;
@@ -27,14 +28,16 @@ const Header = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await axios.get<Category[]>('http://localhost:5050/api/categories');
+        // <<<< SỬA ĐỔI Ở ĐÂY >>>>
+        const response = await axiosInstance.get<Category[]>('/api/categories');
         setCategories(response.data);
       } catch (error) {
         console.error("Failed to fetch categories:", error);
+        // Bạn có thể thêm xử lý lỗi cho người dùng ở đây nếu cần
       }
     };
     fetchCategories();
-  }, []);
+  }, []); // Dependency array rỗng để chỉ fetch một lần khi component mount
 
   const handleCategoriesMouseEnter = () => {
     if (categoriesTimeoutRef.current) {
@@ -46,7 +49,7 @@ const Header = () => {
   const handleCategoriesMouseLeave = () => {
     categoriesTimeoutRef.current = setTimeout(() => {
       setIsCategoriesDropdownOpen(false);
-    }, 200);
+    }, 200); // Giữ dropdown mở một chút để người dùng có thể di chuột vào
   };
 
   const toggleMobileMenu = () => {
@@ -58,7 +61,7 @@ const Header = () => {
       "text-light/80 hover:text-highlight transition-colors duration-200 py-2 text-base font-medium",
       isActive ? "text-highlight font-semibold" : ""
     );
-  
+
   const mobileNavLinkClasses = ({ isActive }: { isActive: boolean }) =>
     cn(
       "block py-3 px-4 text-lg text-light/90 hover:bg-dark rounded-md transition-colors duration-200",
@@ -82,35 +85,29 @@ const Header = () => {
             <NavLink to="/" className={navLinkClasses}>Trang Chủ</NavLink>
             <NavLink to="/alltopic" className={navLinkClasses}>Ngữ Văn</NavLink>
             <NavLink to="/gigs" className={navLinkClasses}>Tiếng Anh</NavLink>
-            
-            <div 
-              className="relative" // Parent div cho dropdown
+
+            <div
+              className="relative"
               onMouseEnter={handleCategoriesMouseEnter}
               onMouseLeave={handleCategoriesMouseLeave}
             >
-              <NavLink 
-                to="/essays" 
+              <NavLink
+                to="/essays"
                 className={navLinkClasses}
-                // Thêm padding để khu vực hover lớn hơn một chút nếu cần
-                // style={{ paddingLeft: '0.5rem', paddingRight: '0.5rem' }} 
               >
                 Bài Văn Mẫu
               </NavLink>
               {isCategoriesDropdownOpen && categories.length > 0 && (
-                // <<<< THAY ĐỔI Ở ĐÂY >>>>
-                <div 
+                <div
                   className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-xs bg-dark shadow-xl rounded-lg p-2 animate-fadeInUpMenu"
-                  // w-max: chiều rộng tự co theo nội dung lớn nhất
-                  // max-w-xs: (tùy chọn) giới hạn chiều rộng tối đa nếu tên category quá dài, ví dụ 320px
-                  // Bạn có thể bỏ max-w-xs nếu muốn nó có thể rộng hơn nữa
                 >
                   <ul className="space-y-1">
                     {categories.map(category => (
                       <li key={category._id}>
-                        <Link 
+                        <Link
                           to={`/category/${category._id}`}
                           className="block whitespace-nowrap px-4 py-2 text-sm text-light/80 hover:bg-secondary hover:text-highlight rounded-md transition-colors"
-                          onClick={() => setIsCategoriesDropdownOpen(false)}
+                          onClick={() => setIsCategoriesDropdownOpen(false)} // Đóng dropdown khi click
                         >
                           {category.name}
                         </Link>
@@ -126,8 +123,8 @@ const Header = () => {
           </nav>
 
           <div className="md:hidden">
-            <button 
-              onClick={toggleMobileMenu} 
+            <button
+              onClick={toggleMobileMenu}
               className="text-light p-2 rounded-md hover:bg-dark focus:outline-none focus:ring-2 focus:ring-inset focus:ring-highlight"
               aria-label="Toggle menu"
               aria-expanded={isMobileMenuOpen}
@@ -156,11 +153,11 @@ const Header = () => {
                 <div className="pl-4 border-l-2 border-secondary">
                   <p className="text-sm text-muted font-medium mt-2 mb-1 px-4">Chuyên mục bài mẫu:</p>
                   {categories.map(category => (
-                     <Link 
+                     <Link
                       key={`mobile-${category._id}`}
                       to={`/category/${category._id}`}
                       className="block py-2 px-4 text-light/80 hover:bg-secondary hover:text-highlight rounded-md transition-colors"
-                      onClick={toggleMobileMenu}
+                      onClick={toggleMobileMenu} // Đóng mobile menu khi click
                     >
                       {category.name}
                     </Link>

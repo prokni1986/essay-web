@@ -1,8 +1,9 @@
 // file: pages/EssaysByCategoryPage.tsx
 import React, { useEffect, useState, useMemo } from 'react';
-import axios from 'axios'; // Đảm bảo đã import AxiosError nếu dùng ở đâu đó, nhưng ở đây không cần trực tiếp
+import axios from 'axios'; // Giữ lại để sử dụng axios.isAxiosError
+import axiosInstance from '../lib/axiosInstance'; // Import axiosInstance
 import { Link, useParams } from 'react-router-dom';
-import Layout from '@/components/Layout'; // Đảm bảo đường dẫn đúng
+import Layout from '@/components/Layout';
 
 // Interfaces
 interface Category {
@@ -14,7 +15,7 @@ interface Category {
 interface Topic {
   _id: string;
   name: string;
-  category: Category | string; // Backend nên populate để đây là Category object
+  category: Category | string;
   description?: string;
   imageUrl?: string;
 }
@@ -23,7 +24,7 @@ interface Essay {
   _id: string;
   title: string;
   content: string;
-  topic?: Topic | null; // Nên là Topic object đầy đủ
+  topic?: Topic | null;
   createdAt?: string;
 }
 
@@ -54,10 +55,10 @@ const EssaysByCategoryPage: React.FC = () => {
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null);
   const [essaysOfThisCategory, setEssaysOfThisCategory] = useState<Essay[]>([]);
   const [topicsInThisCategory, setTopicsInThisCategory] = useState<Topic[]>([]);
-  
+
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedTopic, setSelectedTopic] = useState<string>('Tất cả');
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,39 +72,38 @@ const EssaysByCategoryPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-      setCurrentCategory(null); // Reset trước khi fetch
+      setCurrentCategory(null);
       setTopicsInThisCategory([]);
       setEssaysOfThisCategory([]);
-      setSelectedTopic('Tất cả'); 
-      setSearchTerm('');      
+      setSelectedTopic('Tất cả');
+      setSearchTerm('');
 
       try {
+        // Sử dụng axiosInstance và đường dẫn tương đối
         const [categoryRes, topicsRes, essaysRes] = await Promise.all([
-          axios.get<Category>(`http://localhost:5050/api/categories/${categoryId}`),
-          axios.get<Topic[]>(`http://localhost:5050/api/topics?category=${categoryId}`),
-          axios.get<Essay[]>(`http://localhost:5050/api/essays?category=${categoryId}`)
+          axiosInstance.get<Category>(`/api/categories/${categoryId}`),
+          axiosInstance.get<Topic[]>(`/api/topics?category=${categoryId}`),
+          axiosInstance.get<Essay[]>(`/api/essays?category=${categoryId}`)
         ]);
 
         setCurrentCategory(categoryRes.data);
         setTopicsInThisCategory(topicsRes.data.sort((a,b) => a.name.localeCompare(b.name)));
-        setEssaysOfThisCategory(essaysRes.data.sort((a, b) => 
+        setEssaysOfThisCategory(essaysRes.data.sort((a, b) =>
             new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
         ));
 
-      } catch (err: unknown) { // Sửa: err: unknown
+      } catch (err: unknown) {
         console.error("Lỗi khi tải dữ liệu cho category:", err);
         let errorMessage = "Không thể tải dữ liệu cho chuyên mục này. Vui lòng thử lại.";
-        
-        if (axios.isAxiosError(err)) { 
-          console.error("Backend response:", err.response?.data); 
-          // Giả định cấu trúc lỗi từ backend là { error: string }
-          const responseData = err.response?.data as { error?: string }; 
-          errorMessage = responseData?.error || err.message; 
+
+        if (axios.isAxiosError(err)) { // Giữ lại check này
+          console.error("Backend response:", err.response?.data);
+          const responseData = err.response?.data as { error?: string };
+          errorMessage = responseData?.error || err.message;
           if (err.response?.status === 404) {
-            // Nếu lỗi 404 có thể là do categoryId không tồn tại
             errorMessage = `Không tìm thấy chuyên mục hoặc dữ liệu liên quan với ID: ${categoryId}.`;
           }
-        } else if (err instanceof Error) { 
+        } else if (err instanceof Error) {
           errorMessage = err.message;
         }
         setError(errorMessage);
@@ -123,7 +123,7 @@ const EssaysByCategoryPage: React.FC = () => {
     }
 
     if (lowerSearchTerm) {
-      filtered = filtered.filter(essay => 
+      filtered = filtered.filter(essay =>
         essay.title.toLowerCase().includes(lowerSearchTerm) ||
         stripHtml(essay.content).toLowerCase().includes(lowerSearchTerm) ||
         (essay.topic?.name || '').toLowerCase().includes(lowerSearchTerm)
@@ -139,7 +139,7 @@ const EssaysByCategoryPage: React.FC = () => {
         relevantEssays = essaysOfThisCategory.filter(e => e.topic?._id === topicId);
     }
     if (lowerSearchTerm) {
-      return relevantEssays.filter(essay => 
+      return relevantEssays.filter(essay =>
         essay.title.toLowerCase().includes(lowerSearchTerm) ||
         stripHtml(essay.content).toLowerCase().includes(lowerSearchTerm)
       ).length;
@@ -178,8 +178,8 @@ const EssaysByCategoryPage: React.FC = () => {
       </Layout>
     );
   }
-  
-  if (!currentCategory && !loading) { // Kiểm tra thêm !loading để không hiển thị khi đang tải
+
+  if (!currentCategory && !loading) {
     return (
       <Layout>
         <div className="flex flex-col justify-center items-center min-h-screen bg-dark text-center px-4">
@@ -217,7 +217,6 @@ const EssaysByCategoryPage: React.FC = () => {
           </header>
 
           <div className="bg-[#1c1c22] p-4 sm:p-6 rounded-xl shadow-xl space-y-6">
-            {/* Search Input */}
             <div className="pt-2 pb-4">
               <input
                 type="text"
@@ -228,7 +227,6 @@ const EssaysByCategoryPage: React.FC = () => {
               />
             </div>
 
-            {/* Topic Tabs */}
             {topicsInThisCategory.length > 0 && (
               <div className="mb-6">
                 <p className="text-sm font-medium text-gray-400 mb-2">Lọc nhanh theo chủ đề:</p>
@@ -236,11 +234,11 @@ const EssaysByCategoryPage: React.FC = () => {
                   <button
                     onClick={() => setSelectedTopic('Tất cả')}
                     className={`py-2 px-4 rounded-lg text-sm font-semibold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1c1c22]
-                      ${selectedTopic === 'Tất cả' 
-                        ? 'bg-yellow-500 text-gray-900 focus:ring-yellow-400' 
+                      ${selectedTopic === 'Tất cả'
+                        ? 'bg-yellow-500 text-gray-900 focus:ring-yellow-400'
                         : 'bg-[#2c2c34] text-gray-300 hover:bg-gray-600 focus:ring-gray-500'}`}
                   >
-                    Tất cả 
+                    Tất cả
                     <span className="ml-1.5 px-1.5 py-0.5 bg-gray-500/50 text-gray-300 text-xs rounded-full">
                       {countEssaysForTopicTab('Tất cả')}
                     </span>
@@ -250,8 +248,8 @@ const EssaysByCategoryPage: React.FC = () => {
                       key={topic._id}
                       onClick={() => setSelectedTopic(topic._id)}
                       className={`py-2 px-4 rounded-lg text-sm font-semibold transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1c1c22]
-                        ${selectedTopic === topic._id 
-                          ? 'bg-yellow-500 text-gray-900 focus:ring-yellow-400' 
+                        ${selectedTopic === topic._id
+                          ? 'bg-yellow-500 text-gray-900 focus:ring-yellow-400'
                           : 'bg-[#2c2c34] text-gray-300 hover:bg-gray-600 focus:ring-gray-500'}`}
                     >
                       {topic.name}
@@ -263,13 +261,12 @@ const EssaysByCategoryPage: React.FC = () => {
                 </div>
               </div>
             )}
-            
-            {/* Essay List */}
+
             {displayedEssays.length > 0 ? (
               <div className="space-y-6">
                 {displayedEssays.map((essay) => (
-                  <div 
-                    key={essay._id} 
+                  <div
+                    key={essay._id}
                     className="bg-[#18181B] p-5 rounded-xl shadow-md transition-all duration-300 hover:shadow-yellow-500/20 hover:ring-1 hover:ring-yellow-500/50 group hover:-translate-y-1"
                   >
                     <h3 className="text-xl sm:text-2xl font-bold text-white group-hover:text-yellow-400 transition-colors duration-200 mb-2">

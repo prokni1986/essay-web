@@ -18,7 +18,7 @@ const app = express();
 const PORT = process.env.PORT || 5050;
 
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:8080','https://essay-web-1.onrender.com'
+  process.env.FRONTEND_URL || 'http://localhost:8080','https://essay-web-1.onrender.com','https://vercel.com/tonys-projects-fa0649a2/essay-web'
 ];
 const corsOptions = {
   origin: function (origin, callback) {

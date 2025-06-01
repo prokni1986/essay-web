@@ -1,6 +1,7 @@
 // EssaysByTopic.tsx
-import React, { useEffect, useState, ChangeEvent } from 'react'; // Thêm ChangeEvent nếu bạn chưa có
-import axios, { AxiosError } from 'axios'; // Import AxiosError
+import React, { useEffect, useState, ChangeEvent } from 'react';
+import axios, { AxiosError } from 'axios'; // Import AxiosError and axios for isAxiosError
+import axiosInstance from '../lib/axiosInstance'; // Import axiosInstance
 import { useParams, Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
 
@@ -33,7 +34,6 @@ interface TopicWithImage {
   imageUrl?: string;
 }
 
-// Định nghĩa kiểu cho lỗi API nếu backend trả về cấu trúc cụ thể
 interface ApiErrorResponse {
   error: string;
 }
@@ -47,7 +47,7 @@ const EssaysByTopic: React.FC = () => {
   const [currentTopic, setCurrentTopic] = useState<TopicWithImage | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>(''); // Kiểu string cho state error
+  const [error, setError] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   useEffect(() => {
@@ -61,15 +61,16 @@ const EssaysByTopic: React.FC = () => {
       setError('');
       setCurrentPage(1);
       try {
-        const topicRes = await axios.get<TopicWithImage>(`http://localhost:5050/api/topics/${topicId}`);
+        // Use axiosInstance and relative paths
+        const topicRes = await axiosInstance.get<TopicWithImage>(`/api/topics/${topicId}`);
         setCurrentTopic(topicRes.data);
 
-        const essaysRes = await axios.get<Essay[]>(`http://localhost:5050/api/essays?topic=${topicId}`);
+        const essaysRes = await axiosInstance.get<Essay[]>(`/api/essays?topic=${topicId}`);
         setAllEssaysForTopic(essaysRes.data);
-      } catch (err) { // Dòng 64 ở đây
+      } catch (err) {
         console.error("Lỗi khi tải dữ liệu:", err);
         let errorMessage = 'Không thể tải dữ liệu chủ đề hoặc bài luận.';
-        if (axios.isAxiosError(err)) {
+        if (axios.isAxiosError(err)) { // Keep using axios.isAxiosError
             const serverError = err.response?.data as ApiErrorResponse;
             errorMessage = serverError?.error || err.message;
         } else if (err instanceof Error) {
@@ -160,7 +161,6 @@ const EssaysByTopic: React.FC = () => {
     return pageNumbers;
   };
 
-  // Phần JSX giữ nguyên như trước
   if (loading) {
     return (
       <Layout>
@@ -213,7 +213,7 @@ const EssaysByTopic: React.FC = () => {
                   src={currentTopic.imageUrl}
                   alt={`Hình ảnh cho chủ đề ${topicName}`}
                   className="w-full max-w-md md:max-w-lg mx-auto rounded-lg shadow-lg border-4 border-gray-700"
-                  style={{ width: '100%', height: '350px', objectFit: 'cover' }} // Đặt chiều cao cố định và objectFit: 'cover'
+                  style={{ width: '100%', height: '350px', objectFit: 'cover' }}
                   onError={(e) => {
                      const target = e.target as HTMLImageElement;
                      target.onerror = null;
