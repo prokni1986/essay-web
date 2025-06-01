@@ -1,9 +1,10 @@
 // file: pages/Index.tsx
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom'; // Sử dụng Link của React Router
+import { Link } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import HeroSectionWithSlider from '@/components/HeroSectionWithSlider';
-import axios from 'axios';
+// Xóa: import axios from 'axios';
+import axiosInstance from '../lib/axiosInstance'; // <<<< THÊM IMPORT AXIOSINSTANCE
 
 // SVG Icon cho mũi tên (giữ nguyên)
 const ArrowRightIcon = () => (
@@ -21,16 +22,14 @@ interface Topic {
   _id: string;
   name: string;
   imageUrl?: string;
-  description?: string; 
-  category: Category | string; 
+  description?: string;
+  category: Category | string;
 }
 
-// <<<< THAY ĐỔI Card Component >>>>
 const Card = ({ title, description, image, link }: { title: string; description?: string; image?: string; link: string }) => (
-  // Sử dụng Link component bao quanh thay vì onClick trên div
-  <Link 
-    to={link} 
-    className="bg-dark rounded-xl p-6 flex flex-col shadow-xl hover:shadow-highlight/20 transition-all duration-300 group transform hover:-translate-y-2 h-full no-underline" // Thêm no-underline
+  <Link
+    to={link}
+    className="bg-dark rounded-xl p-6 flex flex-col shadow-xl hover:shadow-highlight/20 transition-all duration-300 group transform hover:-translate-y-2 h-full no-underline"
   >
     <div className="w-full h-56 rounded-lg overflow-hidden mb-6 relative bg-gray-700">
       {image ? (
@@ -48,8 +47,7 @@ const Card = ({ title, description, image, link }: { title: string; description?
     <p className="text-light/70 mb-5 text-base leading-relaxed flex-grow">
       {description || "Mô tả cho chủ đề này đang được cập nhật..."}
     </p>
-    {/* Nút "Xem chi tiết" có thể giữ lại hoặc bỏ đi nếu cả card đã là Link */}
-    <span // Giữ lại span để style giống như Link, nhưng không cần Link lồng Link
+    <span
       className="inline-flex items-center mt-auto text-highlight font-semibold transition-colors text-lg group-hover:underline"
     >
       Xem chi tiết <ArrowRightIcon />
@@ -69,8 +67,8 @@ const Index = () => {
   const [error, setError] = useState<string | null>(null);
 
   const CATEGORY_NAMES = {
-    NLXH: "Nghị Luận Xã hội", 
-    NLVH: "Nghị luận văn học"  
+    NLXH: "Nghị Luận Xã hội",
+    NLVH: "Nghị luận văn học"
   };
 
   useEffect(() => {
@@ -78,8 +76,9 @@ const Index = () => {
       setLoading(true);
       setError(null);
       try {
-        const categoriesRes = await axios.get<Category[]>('http://localhost:5050/api/categories');
-        const allAvailableTopicsRes = await axios.get<Topic[]>('http://localhost:5050/api/topics');
+        // <<<< SỬA ĐỔI Ở ĐÂY >>>>
+        const categoriesRes = await axiosInstance.get<Category[]>('/api/categories');
+        const allAvailableTopicsRes = await axiosInstance.get<Topic[]>('/api/topics');
 
         const allCategories = categoriesRes.data;
         const allTopics = allAvailableTopicsRes.data;
@@ -90,7 +89,7 @@ const Index = () => {
         if (nlxhCategory) {
           const topicsInNlxh = allTopics
             .filter(topic => (typeof topic.category === 'string' ? topic.category : topic.category?._id) === nlxhCategory._id)
-            .slice(0, 3); 
+            .slice(0, 3);
           setNlxhTopics(topicsInNlxh);
         } else {
           console.warn(`Không tìm thấy category: ${CATEGORY_NAMES.NLXH}`);
@@ -99,7 +98,7 @@ const Index = () => {
         if (nlvhCategory) {
           const topicsInNlvh = allTopics
             .filter(topic => (typeof topic.category === 'string' ? topic.category : topic.category?._id) === nlvhCategory._id)
-            .slice(0, 3); 
+            .slice(0, 3);
           setNlvhTopics(topicsInNlvh);
         } else {
           console.warn(`Không tìm thấy category: ${CATEGORY_NAMES.NLVH}`);
@@ -108,13 +107,16 @@ const Index = () => {
       } catch (err) {
         console.error("Lỗi khi tải dữ liệu cho trang chủ:", err);
         setError("Không thể tải dữ liệu. Vui lòng thử lại sau.");
+        // Trong trường hợp lỗi, bạn có thể muốn xử lý error object cụ thể hơn
+        // Ví dụ: if (axios.isAxiosError(err)) { ... }
+        // Nhưng để làm vậy, bạn cần giữ lại import axios và AxiosError
       } finally {
         setLoading(false);
       }
     };
 
     fetchDataForHomepage();
-  }, [CATEGORY_NAMES.NLXH, CATEGORY_NAMES.NLVH]); 
+  }, [CATEGORY_NAMES.NLXH, CATEGORY_NAMES.NLVH]);
 
 
   const englishSectionTopics = [
@@ -122,14 +124,44 @@ const Index = () => {
     { title: "Advanced Vocabulary", description: "Expand your lexicon with sophisticated words and phrases for academic writing.", image: "https://images.unsplash.com/photo-1488190211105-8b0e65b80b4e?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80", link: "/gigs" },
     { title: "IELTS Writing Strategies", description: "Master techniques for achieving a high score in IELTS Writing tasks.", image: "https://images.unsplash.com/photo-1554415707-6e8cfc93fe23?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1000&q=80", link: "/gigs" }
   ];
-  
-  if (loading) { /* ... Loading UI ... */ }
-  if (error) { /* ... Error UI ... */ }
 
+  // <<<< THÊM UI CHO LOADING VÀ ERROR >>>>
+  if (loading) {
+    return (
+        <Layout>
+            <div className="flex justify-center items-center min-h-screen bg-dark">
+                <div className="text-center">
+                    <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-highlight border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+                        <span className="sr-only">Loading...</span>
+                    </div>
+                    <p className="mt-4 text-xl text-light">Đang tải trang chủ...</p>
+                </div>
+            </div>
+        </Layout>
+    );
+  }
+
+  if (error) {
+    return (
+        <Layout>
+            <div className="flex flex-col justify-center items-center min-h-screen bg-dark text-center px-4">
+                <div className="p-8 bg-secondary rounded-lg shadow-xl max-w-md w-full">
+                    <svg className="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <h2 className="text-2xl font-bold text-red-400 mb-3">Đã xảy ra lỗi!</h2>
+                    <p className="text-light/80 mb-6">{error}</p>
+                    <Link to="/" onClick={() => window.location.reload()} className="px-6 py-3 bg-highlight text-dark font-semibold rounded-lg hover:bg-yellow-300 transition-colors duration-150 text-base">
+                        Thử lại
+                    </Link>
+                </div>
+            </div>
+        </Layout>
+    );
+  }
+  // Phần còn lại của return JSX giữ nguyên
   return (
     <Layout>
       <HeroSectionWithSlider />
-      
+
       {/* Section Nghị Luận Xã Hội */}
       <section className={`${sectionPadding} bg-secondary`}>
         <div className="max-w-7xl mx-auto">
@@ -142,12 +174,12 @@ const Index = () => {
           {nlxhTopics.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {nlxhTopics.map((topic) => (
-                <Card 
-                  key={topic._id} 
+                <Card
+                  key={topic._id}
                   title={topic.name}
-                  description={topic.description} 
+                  description={topic.description}
                   image={topic.imageUrl}
-                  link={`/topic/${topic._id}`} // Link đến trang EssaysByTopic
+                  link={`/topic/${topic._id}`}
                 />
               ))}
             </div>
@@ -156,7 +188,7 @@ const Index = () => {
           )}
           <div className="text-center mt-16">
             <Link
-              to="/alltopic" // Hoặc link tới trang hiển thị tất cả topic của category NLXH
+              to="/alltopic"
               className="px-10 py-4 bg-highlight text-dark font-semibold rounded-lg text-lg hover:bg-yellow-300 transition-colors shadow-md hover:shadow-lg transform hover:scale-105 inline-block"
             >
               Xem Tất Cả Chủ Đề {CATEGORY_NAMES.NLXH}
@@ -177,12 +209,12 @@ const Index = () => {
           {nlvhTopics.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {nlvhTopics.map((topic) => (
-                 <Card 
-                  key={topic._id} 
+                 <Card
+                  key={topic._id}
                   title={topic.name}
                   description={topic.description}
                   image={topic.imageUrl}
-                  link={`/topic/${topic._id}`} // Link đến trang EssaysByTopic
+                  link={`/topic/${topic._id}`}
                 />
               ))}
             </div>
@@ -191,7 +223,7 @@ const Index = () => {
           )}
            <div className="text-center mt-16">
             <Link
-              to="/alltopic" // Hoặc link tới trang hiển thị tất cả topic của category NLVH
+              to="/alltopic"
               className="px-10 py-4 bg-transparent border-2 border-highlight text-highlight font-semibold rounded-lg text-lg hover:bg-highlight hover:text-dark transition-all duration-300 shadow-md hover:shadow-lg transform hover:scale-105 inline-block"
             >
               Khám Phá Bài Mẫu {CATEGORY_NAMES.NLVH}
@@ -200,22 +232,47 @@ const Index = () => {
         </div>
       </section>
 
-      {/* Section Tiếng Anh (giữ nguyên dữ liệu mẫu) */}
+      {/* Section Tiếng Anh */}
       <section className={`${sectionPadding} bg-secondary`}>
           <div className="max-w-7xl mx-auto">
-            {/* ... nội dung section tiếng Anh ... */}
+            <h2 className={`${sectionTitleBase} text-light`}>
+                Bài Luận <span className="text-highlight">Tiếng Anh</span> Mẫu
+            </h2>
+            <p className={sectionDescriptionBase}>
+                Explore well-structured English essays on various topics. Enhance your writing skills with our curated examples and guides.
+            </p>
              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
                {englishSectionTopics.map((item, index) => (
                 <Card key={`english-${index}`} {...item} />
               ))}
             </div>
-            {/* ... nút xem tất cả tiếng Anh ... */}
+            <div className="text-center mt-16">
+                <Link
+                to="/gigs"
+                className="px-10 py-4 bg-highlight text-dark font-semibold rounded-lg text-lg hover:bg-yellow-300 transition-colors shadow-md hover:shadow-lg transform hover:scale-105 inline-block"
+                >
+                Explore All English Essays
+                </Link>
+            </div>
           </div>
         </section>
 
-      {/* Section Call to Action (giữ nguyên) */}
+      {/* Section Call to Action */}
       <section className={`${sectionPadding} bg-dark`}>
-        {/* ... */}
+        <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-4xl md:text-5xl font-heading font-bold text-light mb-8">
+                Nâng Tầm Bài Viết Của Bạn Ngay Hôm Nay!
+            </h2>
+            <p className="text-xl text-light/80 mb-12 leading-relaxed">
+                Dù bạn đang tìm kiếm ý tưởng, muốn cải thiện kỹ năng, hay cần một bài mẫu hoàn chỉnh, chúng tôi luôn sẵn sàng hỗ trợ.
+            </p>
+            <Link
+                to="/alltopic"
+                className="px-12 py-5 bg-highlight text-dark font-bold rounded-lg text-xl hover:bg-yellow-300 transition-colors shadow-lg hover:shadow-xl transform hover:scale-105 inline-block"
+            >
+                Bắt Đầu Ngay
+            </Link>
+        </div>
       </section>
     </Layout>
   );

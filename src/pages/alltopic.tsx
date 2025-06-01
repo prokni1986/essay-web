@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import axios from 'axios';
-import Layout from '@/components/Layout'; 
+// Xóa: import axios from 'axios';
+import axiosInstance from '../lib/axiosInstance'; // <<<< THÊM IMPORT AXIOSINSTANCE
+import Layout from '@/components/Layout';
 
 interface Topic {
   _id: string;
   name: string;
-  imageUrl?: string; // Cập nhật interface để bao gồm imageUrl
-  // description?: string; 
+  imageUrl?: string;
 }
 
-const TOPICS_PER_PAGE = 6; 
+const TOPICS_PER_PAGE = 6;
 
 const AllTopic: React.FC = () => {
   const [allFetchedTopics, setAllFetchedTopics] = useState<Topic[]>([]);
@@ -25,12 +25,16 @@ const AllTopic: React.FC = () => {
       setLoading(true);
       setError('');
       try {
+        // <<<< SỬA ĐỔI Ở ĐÂY >>>>
         // Đảm bảo API trả về imageUrl
-        const response = await axios.get<Topic[]>('http://localhost:5050/api/topics');
+        const response = await axiosInstance.get<Topic[]>('/api/topics');
         setAllFetchedTopics(response.data);
       } catch (err) {
         setError('Không thể tải danh sách chủ đề. Vui lòng thử lại sau.');
         console.error("Lỗi khi tải chủ đề:", err);
+        // Bạn có thể muốn thêm xử lý lỗi cụ thể hơn ở đây nếu cần
+        // Ví dụ: if (axios.isAxiosError(err)) { ... }
+        // Nhưng để làm vậy, bạn cần giữ lại import axios và AxiosError
       } finally {
         setLoading(false);
       }
@@ -39,7 +43,7 @@ const AllTopic: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setCurrentPage(1); 
+    setCurrentPage(1);
     if (!searchTerm) {
       setDisplayedTopics(allFetchedTopics);
       return;
@@ -65,7 +69,17 @@ const AllTopic: React.FC = () => {
       setCurrentPage(pageNumber);
       const topicGridElement = document.getElementById('topic-grid-container');
       if (topicGridElement) {
-        topicGridElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Cuộn lên đầu của topicGridElement với một khoảng offset nhỏ từ top
+        const offset = 80; // Khoảng cách từ top (chiều cao của header chẳng hạn)
+        const bodyRect = document.body.getBoundingClientRect().top;
+        const elementRect = topicGridElement.getBoundingClientRect().top;
+        const elementPosition = elementRect - bodyRect;
+        const offsetPosition = elementPosition - offset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: 'smooth'
+        });
       }
     }
   };
@@ -92,6 +106,21 @@ const AllTopic: React.FC = () => {
         endPage = currentPage + maxPagesAfterCurrentPage;
       }
     }
+    // Nút trang đầu và "..."
+    if (startPage > 1) {
+      pageNumbers.push(
+        <button
+          key={1}
+          onClick={() => handlePageChange(1)}
+          className="py-2 px-4 mx-1 border rounded-md text-sm font-medium transition-colors duration-150 focus:outline-none bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+        >
+          1
+        </button>
+      );
+      if (startPage > 2) {
+        pageNumbers.push(<span key="start-ellipsis" className="py-2 px-3 mx-1 text-gray-500">...</span>);
+      }
+    }
 
     for (let i = startPage; i <= endPage; i++) {
       pageNumbers.push(
@@ -100,11 +129,26 @@ const AllTopic: React.FC = () => {
           onClick={() => handlePageChange(i)}
           className={`py-2 px-4 mx-1 border rounded-md text-sm font-medium transition-colors duration-150 focus:outline-none
             ${currentPage === i
-              ? 'bg-green-500 text-white border-green-500' // Màu này có thể cần điều chỉnh cho nhất quán
-              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100' // Màu này khác với các nút phân trang khác
+              ? 'bg-yellow-400 text-white border-yellow-400' // Màu active nhất quán hơn
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
             }`}
         >
           {i}
+        </button>
+      );
+    }
+    // Nút trang cuối và "..."
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        pageNumbers.push(<span key="end-ellipsis" className="py-2 px-3 mx-1 text-gray-500">...</span>);
+      }
+      pageNumbers.push(
+        <button
+          key={totalPages}
+          onClick={() => handlePageChange(totalPages)}
+          className="py-2 px-4 mx-1 border rounded-md text-sm font-medium transition-colors duration-150 focus:outline-none bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+        >
+          {totalPages}
         </button>
       );
     }
@@ -117,7 +161,10 @@ const AllTopic: React.FC = () => {
         <section className="py-10 px-4 text-center" style={{ background: "#23232b", minHeight: "100vh" }}>
           <div className="max-w-5xl mx-auto">
             <div className="bg-[#23232b] rounded-2xl px-8 py-10 shadow-xl">
-              <h1 className="text-3xl font-bold text-white">Đang tải danh sách chủ đề...</h1>
+              <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-yellow-400 border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+                <span className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
+              </div>
+              <h1 className="text-2xl font-semibold text-white mt-4">Đang tải danh sách chủ đề...</h1>
             </div>
           </div>
         </section>
@@ -201,9 +248,16 @@ const AllTopic: React.FC = () => {
                     justifyContent: "center",
                   }}
                 >
-                  {/* THAY THẾ SVG BẰNG IMG NẾU CÓ topic.imageUrl */}
                   {topic.imageUrl ? (
-                    <img src={topic.imageUrl} alt={topic.name} className="object-cover w-full h-full" style={{ minHeight: 150 }} />
+                    <img src={topic.imageUrl} alt={topic.name} className="object-cover w-full h-full" style={{ minHeight: 150 }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        // Optional: replace with a placeholder SVG or hide
+                        target.closest('div')?.insertAdjacentHTML('beforeend', '<svg class="w-16 h-16 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>');
+                        target.style.display = 'none';
+                      }}
+                    />
                   ) : (
                     <svg className="w-16 h-16 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                   )}
@@ -227,7 +281,7 @@ const AllTopic: React.FC = () => {
                 onClick={() => handlePageChange(currentPage - 1)}
                 disabled={currentPage === 1}
                 className="py-2 px-4 border rounded-md text-sm font-medium transition-colors duration-150 focus:outline-none
-                           bg-white text-gray-700 border-gray-300 hover:bg-gray-100 
+                           bg-white text-gray-700 border-gray-300 hover:bg-gray-100
                            disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 « Trước
