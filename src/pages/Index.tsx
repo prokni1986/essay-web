@@ -22,7 +22,7 @@ interface Topic {
   _id: string;
   name: string;
   imageUrl?: string;
-  description?: string;
+  description?: string;x
   category: Category | string;
 }
 
