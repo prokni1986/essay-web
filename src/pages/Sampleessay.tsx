@@ -1,14 +1,14 @@
 // src/pages/SampleEssay.tsx
-import React, { useEffect, useState, useCallback } from 'react'; // <<<< ADD useCallback
-import axios from 'axios';
-import axiosInstance from '../lib/axiosInstance';
+import React, { useEffect, useState, useCallback } from 'react';
+import axios from 'axios'; // Vẫn cần cho axios.isAxiosError
+import axiosInstance from '../lib/axiosInstance'; // Đảm bảo đường dẫn đúng
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import Layout from '@/components/Layout';
-import { useAuth } from '../contexts/AuthContext';
-import { Button } from '@/components/ui/button';
+import Layout from '@/components/Layout'; // Đảm bảo đường dẫn đúng
+import { useAuth } from '../contexts/AuthContext'; // Đảm bảo đường dẫn đúng
+import { Button } from '@/components/ui/button'; // Đảm bảo đường dẫn đúng
 import { toast } from 'sonner';
 
-// Helper function (giữ nguyên)
+// Helper function
 const stripHtml = (html: string): string => {
   if (typeof document !== 'undefined') {
     const tmp = document.createElement('div');
@@ -40,10 +40,10 @@ interface EssayData {
   message?: string;
 }
 
-// Define a more specific type for Axios errors if you expect a certain error response structure
+// Kiểu cho response lỗi từ API (tùy chỉnh nếu cần)
 interface ApiErrorResponse {
   message?: string;
-  errors?: Array<{ msg: string }>; // If your backend sends an array of errors
+  errors?: Array<{ msg: string }>;
 }
 
 
@@ -53,12 +53,11 @@ const SampleEssay: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const { isAuthenticated, user, isLoading: authIsLoading } = useAuth();
+  const { isAuthenticated, isLoading: authIsLoading } = useAuth(); // Bỏ 'user' nếu không dùng trực tiếp ở đây
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Wrap fetchEssay in useCallback to stabilize its reference
-  const fetchEssay = useCallback(async () => { // <<<< WRAP with useCallback
+  const fetchEssay = useCallback(async () => {
     if (!id) {
       setError('ID bài luận không hợp lệ.');
       setLoading(false);
@@ -75,21 +74,20 @@ const SampleEssay: React.FC = () => {
         if (err.response?.status === 404) {
             setError('Không tìm thấy bài luận được yêu cầu.');
         } else {
-            // You can be more specific with the error data type if you know its structure
             const errorData = err.response?.data as ApiErrorResponse;
             setError(errorData?.message || 'Không thể tải chi tiết bài luận. Vui lòng thử lại sau.');
         }
       } else {
-          setError('Đã xảy ra lỗi không xác định.');
+          setError('Đã xảy ra lỗi không xác định khi tải bài luận.');
       }
     } finally {
       setLoading(false);
     }
-  }, [id]); // <<<< id is a dependency of fetchEssay
+  }, [id]);
 
   useEffect(() => {
     fetchEssay();
-  }, [fetchEssay]); // <<<< NOW fetchEssay is stable and correctly listed as a dependency
+  }, [fetchEssay]);
 
 
   const handleSubscribeEssay = async (essayId: string) => {
@@ -99,15 +97,16 @@ const SampleEssay: React.FC = () => {
       return;
     }
     try {
-      const response = await axiosInstance.post<{ message: string }>(`/api/subscriptions/essay/${essayId}`); // Be specific with response type
+      const response = await axiosInstance.post<{ message: string }>(`/api/subscriptions/essay/${essayId}`);
       toast.success(response.data.message || "Đăng ký bài luận thành công!");
-      fetchEssay();
-    } catch (error) { // <<<< Line 100: Corrected 'any'
+      fetchEssay(); // Tải lại để cập nhật trạng thái
+    } catch (error) {
       if (axios.isAxiosError(error)) {
-        const errorData = error.response?.data as ApiErrorResponse; // Use the specific error type
+        const errorData = error.response?.data as ApiErrorResponse;
         toast.error(errorData?.message || "Lỗi khi đăng ký bài luận.");
       } else {
         toast.error("Lỗi không xác định khi đăng ký bài luận.");
+        console.error("Non-Axios error in handleSubscribeEssay:", error);
       }
     }
   };
@@ -119,26 +118,27 @@ const SampleEssay: React.FC = () => {
       return;
     }
     try {
-      const response = await axiosInstance.post<{ message: string }>(`/api/subscriptions/full-access`); // Be specific
+      const response = await axiosInstance.post<{ message: string }>(`/api/subscriptions/full-access`);
       toast.success(response.data.message || "Đăng ký gói Full Access thành công!");
-      fetchEssay();
-    } catch (error) { // <<<< Line 116: Corrected 'any'
+      fetchEssay(); // Tải lại để cập nhật trạng thái
+    } catch (error) {
       if (axios.isAxiosError(error)) {
-        const errorData = error.response?.data as ApiErrorResponse; // Use the specific error type
+        const errorData = error.response?.data as ApiErrorResponse;
         toast.error(errorData?.message || "Lỗi khi đăng ký gói Full Access.");
       } else {
         toast.error("Lỗi không xác định khi đăng ký gói Full Access.");
+        console.error("Non-Axios error in handleSubscribeFullAccess:", error);
       }
     }
   };
 
-  const getShortTitle = (title: string | undefined, maxLength: number = 30) => {
+  const getShortTitle = (title: string | undefined, maxLength: number = 30): string => {
     if (!title) return '';
     if (title.length <= maxLength) return title;
     return title.substring(0, maxLength).trimEnd() + '...';
   };
 
-  const renderAudioPlayer = (audioSrc: string | undefined) => {
+  const renderAudioPlayer = (audioSrc: string | undefined): JSX.Element | null => {
     if (!audioSrc) return null;
     return (
       <audio
@@ -206,8 +206,10 @@ const SampleEssay: React.FC = () => {
   }
 
   const pageTitle = essay?.title || "Chi tiết Bài luận";
+  // Đảm bảo topic là object trước khi truy cập name và _id
   const topicName = essay?.topic && typeof essay.topic === 'object' ? essay.topic.name : 'Chủ đề không xác định';
   const topicIdForLink = essay?.topic && typeof essay.topic === 'object' ? essay.topic._id : null;
+
 
   return (
     <Layout>
@@ -376,6 +378,7 @@ const SampleEssay: React.FC = () => {
           </div>
         </div>
       </section>
+      {/* CSS Styles */}
       <style>{`
         .custom-audio-controls {
           filter: invert(1) brightness(0.8) hue-rotate(180deg) saturate(0.5);
