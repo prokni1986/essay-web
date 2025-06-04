@@ -1,9 +1,10 @@
 // file: components/Header.tsx
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom'; // <<<< THÊM useNavigate
 import { cn } from "@/lib/utils";
-// Xóa: import axios from 'axios';
-import axiosInstance from '../lib/axiosInstance'; // <<<< THÊM IMPORT AXIOSINSTANCE
+import axiosInstance from '../lib/axiosInstance';
+import { useAuth } from '../contexts/AuthContext'; // <<<< THÊM IMPORT useAuth
+import { Button } from "@/components/ui/button"; // <<<< THÊM IMPORT Button (nếu bạn muốn dùng cho Đăng nhập/Đăng ký)
 
 interface Category {
   _id: string;
@@ -17,6 +18,10 @@ const Header = () => {
   const [categories, setCategories] = useState<Category[]>([]);
   const categoriesTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // THÊM MỚI: Lấy thông tin xác thực từ AuthContext
+  const { isAuthenticated, user, logout, isLoading: authIsLoading } = useAuth();
+  const navigate = useNavigate(); // THÊM MỚI
+
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20);
@@ -28,16 +33,14 @@ const Header = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        // <<<< SỬA ĐỔI Ở ĐÂY >>>>
         const response = await axiosInstance.get<Category[]>('/api/categories');
         setCategories(response.data);
       } catch (error) {
         console.error("Failed to fetch categories:", error);
-        // Bạn có thể thêm xử lý lỗi cho người dùng ở đây nếu cần
       }
     };
     fetchCategories();
-  }, []); // Dependency array rỗng để chỉ fetch một lần khi component mount
+  }, []);
 
   const handleCategoriesMouseEnter = () => {
     if (categoriesTimeoutRef.current) {
@@ -49,12 +52,20 @@ const Header = () => {
   const handleCategoriesMouseLeave = () => {
     categoriesTimeoutRef.current = setTimeout(() => {
       setIsCategoriesDropdownOpen(false);
-    }, 200); // Giữ dropdown mở một chút để người dùng có thể di chuột vào
+    }, 200);
   };
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
+
+  // THÊM MỚI: Hàm xử lý đăng xuất
+  const handleLogout = () => {
+    logout();
+    toggleMobileMenu(); // Đóng menu mobile nếu đang mở
+    navigate('/'); // Chuyển về trang chủ
+  };
+
 
   const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -67,6 +78,81 @@ const Header = () => {
       "block py-3 px-4 text-lg text-light/90 hover:bg-dark rounded-md transition-colors duration-200",
       isActive ? "bg-dark text-highlight font-semibold" : ""
     );
+
+  // Component nhỏ để hiển thị phần user hoặc nút login/register cho desktop
+  const AuthSectionDesktop = () => {
+    if (authIsLoading && !isAuthenticated) { // Chỉ hiển thị loading nếu chưa xác thực và đang kiểm tra
+        return <div className="text-sm text-light/70">Đang tải...</div>;
+    }
+    if (isAuthenticated && user) {
+      return (
+        <div className="flex items-center space-x-3">
+          <span className="text-light/90 text-sm">Chào, {user.username}!</span>
+          {/* <NavLink to="/profile" className={navLinkClasses}>Tài Khoản</NavLink> */}
+          <Button
+            onClick={handleLogout}
+            variant="outline"
+            size="sm"
+            className="border-highlight text-highlight hover:bg-highlight hover:text-dark transition-colors"
+          >
+            Đăng xuất
+          </Button>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center space-x-3">
+        <NavLink to="/login">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-light/70 text-light/80 hover:border-highlight hover:text-highlight transition-colors"
+          >
+            Đăng nhập
+          </Button>
+        </NavLink>
+        <NavLink to="/register">
+          <Button
+            variant="default"
+            size="sm"
+            className="bg-highlight text-dark hover:bg-opacity-80 transition-colors"
+          >
+            Đăng ký
+          </Button>
+        </NavLink>
+      </div>
+    );
+  };
+
+    // Component nhỏ để hiển thị phần user hoặc nút login/register cho mobile
+  const AuthSectionMobile = () => {
+    if (authIsLoading && !isAuthenticated) {
+        return <div className="px-4 py-2 text-light/70">Đang tải...</div>;
+    }
+    if (isAuthenticated && user) {
+      return (
+        <>
+          <div className="px-4 py-2 text-light border-t border-b border-secondary/30">
+            <span className="font-medium">Tài khoản: {user.username}</span>
+          </div>
+          {/* <NavLink to="/profile" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Thông tin cá nhân</NavLink> */}
+          <button
+            onClick={handleLogout}
+            className="w-full text-left block py-3 px-4 text-lg text-highlight hover:bg-dark rounded-md transition-colors duration-200"
+          >
+            Đăng xuất
+          </button>
+        </>
+      );
+    }
+    return (
+      <>
+        <NavLink to="/login" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Đăng nhập</NavLink>
+        <NavLink to="/register" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Đăng ký</NavLink>
+      </>
+    );
+  };
+
 
   return (
     <>
@@ -81,7 +167,8 @@ const Header = () => {
             Thi Điểm Cao<span className="text-highlight">.</span>
           </Link>
 
-          <nav className="hidden md:flex items-center space-x-8">
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center space-x-6"> {/* Giảm space-x một chút nếu cần */}
             <NavLink to="/" className={navLinkClasses}>Trang Chủ</NavLink>
             <NavLink to="/alltopic" className={navLinkClasses}>Ngữ Văn</NavLink>
             <NavLink to="/gigs" className={navLinkClasses}>Tiếng Anh</NavLink>
@@ -107,7 +194,7 @@ const Header = () => {
                         <Link
                           to={`/category/${category._id}`}
                           className="block whitespace-nowrap px-4 py-2 text-sm text-light/80 hover:bg-secondary hover:text-highlight rounded-md transition-colors"
-                          onClick={() => setIsCategoriesDropdownOpen(false)} // Đóng dropdown khi click
+                          onClick={() => setIsCategoriesDropdownOpen(false)}
                         >
                           {category.name}
                         </Link>
@@ -117,12 +204,21 @@ const Header = () => {
                 </div>
               )}
             </div>
+            <NavLink to="/about" className={navLinkClasses}>Liên Hệ</NavLink> {/* Giả sử bạn có trang /about */}
+            {/* <NavLink to="/contact" className={navLinkClasses}>Hỗ trợ</NavLink> */} {/* Có vẻ "Liên hệ" và "Hỗ trợ" có thể là một */}
 
-            <NavLink to="/about" className={navLinkClasses}>Liên Hệ</NavLink>
-            <NavLink to="/contact" className={navLinkClasses}>Hỗ trợ</NavLink>
+            {/* THÊM MỚI: Auth section cho desktop */}
+            <div className="border-l border-light/20 pl-6 ml-2"> {/* Thêm đường kẻ dọc phân cách */}
+                <AuthSectionDesktop />
+            </div>
           </nav>
 
-          <div className="md:hidden">
+          {/* Mobile Menu Button */}
+          <div className="md:hidden flex items-center">
+            {/* THÊM MỚI: Hiển thị tên user nếu đã login trên mobile, trước nút menu */}
+            {/* {isAuthenticated && user && (
+                <span className="text-sm text-light/80 mr-2">Hi, {user.username}</span>
+            )} */}
             <button
               onClick={toggleMobileMenu}
               className="text-light p-2 rounded-md hover:bg-dark focus:outline-none focus:ring-2 focus:ring-inset focus:ring-highlight"
@@ -142,22 +238,23 @@ const Header = () => {
           </div>
         </div>
 
+        {/* Mobile Menu Panel */}
         {isMobileMenuOpen && (
           <div className="md:hidden bg-dark/95 backdrop-blur-md pt-4 pb-6 px-6 absolute top-full left-0 w-full animate-slideDown">
-            <nav className="flex flex-col space-y-2">
+            <nav className="flex flex-col space-y-1"> {/* Giảm space-y một chút */}
               <NavLink to="/" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Trang Chủ</NavLink>
               <NavLink to="/alltopic" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Ngữ Văn</NavLink>
               <NavLink to="/gigs" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Tiếng Anh</NavLink>
               <NavLink to="/essays" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Bài Văn Mẫu (Tất cả)</NavLink>
               {categories.length > 0 && (
-                <div className="pl-4 border-l-2 border-secondary">
-                  <p className="text-sm text-muted font-medium mt-2 mb-1 px-4">Chuyên mục bài mẫu:</p>
+                <div className="pl-4 border-l-2 border-secondary my-2"> {/* Thêm my-2 */}
+                  <p className="text-xs text-muted uppercase font-semibold mt-2 mb-1 px-4">Chuyên mục bài mẫu:</p>
                   {categories.map(category => (
                      <Link
                       key={`mobile-${category._id}`}
                       to={`/category/${category._id}`}
-                      className="block py-2 px-4 text-light/80 hover:bg-secondary hover:text-highlight rounded-md transition-colors"
-                      onClick={toggleMobileMenu} // Đóng mobile menu khi click
+                      className="block py-2 px-4 text-sm text-light/80 hover:bg-secondary hover:text-highlight rounded-md transition-colors" // Giảm text size
+                      onClick={toggleMobileMenu}
                     >
                       {category.name}
                     </Link>
@@ -165,11 +262,17 @@ const Header = () => {
                 </div>
               )}
               <NavLink to="/about" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Liên Hệ</NavLink>
-              <NavLink to="/contact" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Hỗ trợ</NavLink>
+              {/* <NavLink to="/contact" className={mobileNavLinkClasses} onClick={toggleMobileMenu}>Hỗ trợ</NavLink> */}
+
+              {/* THÊM MỚI: Auth section cho mobile */}
+              <div className="mt-4 pt-4 border-t border-light/20">
+                <AuthSectionMobile />
+              </div>
             </nav>
           </div>
         )}
       </header>
+      {/* CSS Animations (giữ nguyên) */}
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes fadeInUpMenu {
           from { opacity: 0; transform: translateY(10px) translateX(-50%); }

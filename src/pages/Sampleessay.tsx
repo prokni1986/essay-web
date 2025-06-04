@@ -1,10 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios'; // Still needed for axios.isAxiosError
-import axiosInstance from '../lib/axiosInstance'; // Import axiosInstance
-import { useParams, Link } from 'react-router-dom';
+// src/pages/SampleEssay.tsx
+import React, { useEffect, useState, useCallback } from 'react'; // <<<< ADD useCallback
+import axios from 'axios';
+import axiosInstance from '../lib/axiosInstance';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
+import { useAuth } from '../contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
-// Helper function
+// Helper function (giữ nguyên)
 const stripHtml = (html: string): string => {
   if (typeof document !== 'undefined') {
     const tmp = document.createElement('div');
@@ -14,83 +18,119 @@ const stripHtml = (html: string): string => {
   return '';
 };
 
-interface Essay {
+interface EssayTopic {
+  _id: string;
+  name: string;
+  category?: { _id: string; name: string; };
+}
+
+interface EssayData {
   _id: string;
   title: string;
-  outline?: string;
-  content: string;
-  essay2?: string;
-  essay3?: string;
+  outline?: string | null;
+  content: string | null;
+  essay2?: string | null;
+  essay3?: string | null;
   audioFiles?: string[];
-  topic?: string | { _id: string; name: string } | null;
+  topic?: EssayTopic | null;
+  createdAt?: string;
+  canViewFullContent: boolean;
+  previewContent?: string;
+  subscriptionStatus?: 'none' | 'subscribed_specific' | 'full_access';
+  message?: string;
 }
+
+// Define a more specific type for Axios errors if you expect a certain error response structure
+interface ApiErrorResponse {
+  message?: string;
+  errors?: Array<{ msg: string }>; // If your backend sends an array of errors
+}
+
 
 const SampleEssay: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const [essay, setEssay] = useState<Essay | null>(null);
+  const [essay, setEssay] = useState<EssayData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [topicName, setTopicName] = useState<string>('');
-  const [topicId, setTopicId] = useState<string>('');
 
-  useEffect(() => {
-    const fetchEssay = async () => {
-      if (!id) {
-        setError('ID bài luận không hợp lệ.');
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      setError('');
-      try {
-        // Use axiosInstance and relative path
-        const response = await axiosInstance.get<Essay>(`/api/essays/${id}`);
-        setEssay(response.data);
+  const { isAuthenticated, user, isLoading: authIsLoading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-        if (response.data.topic) {
-          if (typeof response.data.topic === 'string') {
-            setTopicId(response.data.topic);
-          } else if (
-            typeof response.data.topic === 'object' &&
-            response.data.topic !== null &&
-            '_id' in response.data.topic
-          ) {
-            setTopicId(response.data.topic._id);
-            setTopicName(response.data.topic.name || '');
-          } else {
-            setTopicId('');
-            setTopicName('');
-          }
-        } else {
-            setTopicId('');
-            setTopicName('');
-        }
-      } catch (err) {
-        console.error("Lỗi khi tải bài luận:", err);
-        if (axios.isAxiosError(err) && err.response?.status === 404) { // axios.isAxiosError is still valid
+  // Wrap fetchEssay in useCallback to stabilize its reference
+  const fetchEssay = useCallback(async () => { // <<<< WRAP with useCallback
+    if (!id) {
+      setError('ID bài luận không hợp lệ.');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const response = await axiosInstance.get<EssayData>(`/api/essays/${id}`);
+      setEssay(response.data);
+    } catch (err) {
+      console.error("Lỗi khi tải bài luận:", err);
+      if (axios.isAxiosError(err)) {
+        if (err.response?.status === 404) {
             setError('Không tìm thấy bài luận được yêu cầu.');
         } else {
-            setError('Không thể tải chi tiết bài luận. Vui lòng thử lại sau.');
+            // You can be more specific with the error data type if you know its structure
+            const errorData = err.response?.data as ApiErrorResponse;
+            setError(errorData?.message || 'Không thể tải chi tiết bài luận. Vui lòng thử lại sau.');
         }
-      } finally {
-        setLoading(false);
+      } else {
+          setError('Đã xảy ra lỗi không xác định.');
       }
-    };
-    fetchEssay();
-  }, [id]);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]); // <<<< id is a dependency of fetchEssay
 
   useEffect(() => {
-    if (topicId && (!topicName || (essay?.topic && typeof essay.topic === 'string' && essay.topic === topicId))) {
-      // Use axiosInstance and relative path
-      axiosInstance
-        .get<{ name: string }>(`/api/topics/${topicId}`)
-        .then(res => setTopicName(res.data.name || 'Chủ đề không tên'))
-        .catch(() => {
-            console.warn(`Không thể tải tên cho chủ đề ID: ${topicId}`);
-            setTopicName('Chủ đề không xác định');
-        });
+    fetchEssay();
+  }, [fetchEssay]); // <<<< NOW fetchEssay is stable and correctly listed as a dependency
+
+
+  const handleSubscribeEssay = async (essayId: string) => {
+    if (!isAuthenticated) {
+      toast.error("Vui lòng đăng nhập để đăng ký bài luận.");
+      navigate('/login', { state: { from: location } });
+      return;
     }
-  }, [topicId, essay?.topic, topicName]);
+    try {
+      const response = await axiosInstance.post<{ message: string }>(`/api/subscriptions/essay/${essayId}`); // Be specific with response type
+      toast.success(response.data.message || "Đăng ký bài luận thành công!");
+      fetchEssay();
+    } catch (error) { // <<<< Line 100: Corrected 'any'
+      if (axios.isAxiosError(error)) {
+        const errorData = error.response?.data as ApiErrorResponse; // Use the specific error type
+        toast.error(errorData?.message || "Lỗi khi đăng ký bài luận.");
+      } else {
+        toast.error("Lỗi không xác định khi đăng ký bài luận.");
+      }
+    }
+  };
+
+  const handleSubscribeFullAccess = async () => {
+     if (!isAuthenticated) {
+      toast.error("Vui lòng đăng nhập để đăng ký gói.");
+      navigate('/login', { state: { from: location } });
+      return;
+    }
+    try {
+      const response = await axiosInstance.post<{ message: string }>(`/api/subscriptions/full-access`); // Be specific
+      toast.success(response.data.message || "Đăng ký gói Full Access thành công!");
+      fetchEssay();
+    } catch (error) { // <<<< Line 116: Corrected 'any'
+      if (axios.isAxiosError(error)) {
+        const errorData = error.response?.data as ApiErrorResponse; // Use the specific error type
+        toast.error(errorData?.message || "Lỗi khi đăng ký gói Full Access.");
+      } else {
+        toast.error("Lỗi không xác định khi đăng ký gói Full Access.");
+      }
+    }
+  };
 
   const getShortTitle = (title: string | undefined, maxLength: number = 30) => {
     if (!title) return '';
@@ -113,7 +153,7 @@ const SampleEssay: React.FC = () => {
     );
   };
 
-  if (loading) {
+  if (loading || authIsLoading) {
     return (
       <Layout>
         <section className="py-10 px-4 text-center" style={{ background: "#23232b", minHeight: "100vh" }}>
@@ -149,7 +189,7 @@ const SampleEssay: React.FC = () => {
   }
 
   if (!essay) {
-    return (
+     return (
       <Layout>
         <section className="py-10 px-4 text-center" style={{ background: "#23232b", minHeight: "100vh" }}>
           <div className="max-w-5xl mx-auto">
@@ -166,6 +206,8 @@ const SampleEssay: React.FC = () => {
   }
 
   const pageTitle = essay?.title || "Chi tiết Bài luận";
+  const topicName = essay?.topic && typeof essay.topic === 'object' ? essay.topic.name : 'Chủ đề không xác định';
+  const topicIdForLink = essay?.topic && typeof essay.topic === 'object' ? essay.topic._id : null;
 
   return (
     <Layout>
@@ -177,10 +219,10 @@ const SampleEssay: React.FC = () => {
               <Link to="/" className="hover:underline text-yellow-400 font-semibold">Trang chủ</Link>
               <span className="mx-1 text-gray-400">/</span>
               <Link to="/essays" className="hover:underline text-yellow-400 font-semibold">Thư viện Bài luận</Link>
-              {topicId && topicName && topicName !== 'Chủ đề không xác định' && topicName !== 'Chủ đề không tên' && (
+              {topicIdForLink && topicName && topicName !== 'Chủ đề không xác định' && topicName !== 'Chủ đề không tên' && (
                 <>
                   <span className="mx-1 text-gray-400">/</span>
-                  <Link to={`/topic/${topicId}`} className="hover:underline text-yellow-400 font-semibold">
+                  <Link to={`/topic/${topicIdForLink}`} className="hover:underline text-yellow-400 font-semibold">
                     {topicName}
                   </Link>
                 </>
@@ -202,80 +244,135 @@ const SampleEssay: React.FC = () => {
         <div className="max-w-5xl mx-auto">
           <div className="bg-[#18181B] shadow-2xl rounded-2xl p-6 md:p-0 mb-10">
             <article>
-              {essay.outline && (
-                <details className="essay-section mt-10" >
-                  <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
-                    <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
-                        <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
-                        <h2 className="text-2xl font-semibold text-yellow-400">Dàn ý chi tiết</h2>
-                    </div>
-                    <div className="flex items-center flex-shrink-0 ml-4">
-                        {renderAudioPlayer(essay.audioFiles?.[0])}
-                    </div>
-                  </summary>
-                  <div
-                    className="mt-2 p-3 px-8 bg-gray-700/30 rounded prose prose-invert prose-lg max-w-none text-gray-200 text-justify"
-                    style={{ lineHeight: '1.85', fontSize: '1.1rem' }}
-                    dangerouslySetInnerHTML={{ __html: essay.outline }}
-                  />
-                </details>
-              )}
+              {essay.canViewFullContent ? (
+                <>
+                  {essay.outline && (
+                    <details className="essay-section mt-10" open>
+                      <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
+                        <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
+                            <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
+                            <h2 className="text-2xl font-semibold text-yellow-400">Dàn ý chi tiết</h2>
+                        </div>
+                        <div className="flex items-center flex-shrink-0 ml-4">
+                            {renderAudioPlayer(essay.audioFiles?.[0])}
+                        </div>
+                      </summary>
+                      <div
+                        className="mt-2 p-3 px-8 bg-gray-700/30 rounded prose prose-invert prose-lg max-w-none text-gray-200 text-justify"
+                        style={{ lineHeight: '1.85', fontSize: '1.1rem' }}
+                        dangerouslySetInnerHTML={{ __html: essay.outline }}
+                      />
+                    </details>
+                  )}
 
-              <details className="essay-section" >
-                <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
-                  <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
-                    <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
-                    <h2 className="text-2xl font-semibold text-yellow-400">Bài luận tham khảo 1</h2>
-                  </div>
-                  <div className="flex items-center flex-shrink-0 ml-4">
-                    {renderAudioPlayer(essay.audioFiles?.[1])}
-                  </div>
-                </summary>
-                <div
-                  className="mt-2 p-3 px-8 bg-gray-700/30 rounded prose prose-invert prose-lg max-w-none text-gray-200 text-justify"
-                  style={{ lineHeight: '1.85', fontSize: '1.1rem' }}
-                  dangerouslySetInnerHTML={{ __html: essay.content }}
-                />
-              </details>
+                  {essay.content && (
+                    <details className="essay-section" open>
+                      <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
+                        <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
+                          <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
+                          <h2 className="text-2xl font-semibold text-yellow-400">Bài luận tham khảo 1</h2>
+                        </div>
+                        <div className="flex items-center flex-shrink-0 ml-4">
+                          {renderAudioPlayer(essay.audioFiles?.[1])}
+                        </div>
+                      </summary>
+                      <div
+                        className="mt-2 p-3 px-8 bg-gray-700/30 rounded prose prose-invert prose-lg max-w-none text-gray-200 text-justify"
+                        style={{ lineHeight: '1.85', fontSize: '1.1rem' }}
+                        dangerouslySetInnerHTML={{ __html: essay.content }}
+                      />
+                    </details>
+                  )}
 
-              {essay.essay2 && (
-                <details className="essay-section">
-                  <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
-                    <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
-                        <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
-                        <h2 className="text-2xl font-semibold text-yellow-400">Bài luận tham khảo 2</h2>
-                    </div>
-                    <div className="flex items-center flex-shrink-0 ml-4">
-                        {renderAudioPlayer(essay.audioFiles?.[2])}
-                    </div>
-                  </summary>
-                  <div
-                    className="mt-2 p-3 px-8 bg-gray-700/30 rounded prose prose-invert prose-lg max-w-none text-gray-200 text-justify"
-                    style={{ lineHeight: '1.85', fontSize: '1.1rem' }}
-                    dangerouslySetInnerHTML={{ __html: essay.essay2 }}
-                  />
-                </details>
-              )}
+                  {essay.essay2 && (
+                    <details className="essay-section" open>
+                      <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
+                        <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
+                            <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
+                            <h2 className="text-2xl font-semibold text-yellow-400">Bài luận tham khảo 2</h2>
+                        </div>
+                        <div className="flex items-center flex-shrink-0 ml-4">
+                            {renderAudioPlayer(essay.audioFiles?.[2])}
+                        </div>
+                      </summary>
+                      <div
+                        className="mt-2 p-3 px-8 bg-gray-700/30 rounded prose prose-invert prose-lg max-w-none text-gray-200 text-justify"
+                        style={{ lineHeight: '1.85', fontSize: '1.1rem' }}
+                        dangerouslySetInnerHTML={{ __html: essay.essay2 }}
+                      />
+                    </details>
+                  )}
 
-              {essay.essay3 && (
-                <details className="essay-section">
-                  <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
-                     <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
-                        <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
-                        <h2 className="text-2xl font-semibold text-yellow-400">Bài luận tham khảo 3</h2>
+                  {essay.essay3 && (
+                    <details className="essay-section" open>
+                      <summary className="flex items-center justify-between border-b border-gray-700 py-3 px-3 cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#18181B] rounded-md group summary-interactive mb-0">
+                         <div className="flex items-center group-hover:text-yellow-400 transition-colors duration-150">
+                            <span className="mr-3 text-yellow-400 text-xl transition-transform duration-200 ease-in-out transform disclosure-arrow">❯</span>
+                            <h2 className="text-2xl font-semibold text-yellow-400">Bài luận tham khảo 3</h2>
+                        </div>
+                         <div className="flex items-center flex-shrink-0 ml-4">
+                            {renderAudioPlayer(essay.audioFiles?.[3])}
+                        </div>
+                      </summary>
+                      <div
+                        className="mt-2 p-3 px-8 bg-gray-700/30 rounded prose prose-invert prose-lg max-w-none text-gray-200 text-justify"
+                        style={{ lineHeight: '1.85', fontSize: '1.1rem' }}
+                        dangerouslySetInnerHTML={{ __html: essay.essay3 }}
+                      />
+                    </details>
+                  )}
+                </>
+              ) : (
+                <div className="mt-10 p-6 border-2 border-dashed border-yellow-500/50 rounded-lg text-center bg-gray-800/30 shadow-lg">
+                  <h2 className="text-2xl font-semibold text-yellow-400 mb-4">Nội dung giới hạn</h2>
+                  {essay.previewContent ? (
+                    <div
+                      className="text-gray-300 mb-6 leading-relaxed prose prose-invert max-w-none text-justify"
+                      dangerouslySetInnerHTML={{ __html: essay.previewContent }}
+                    />
+                  ) : (
+                    <p className="text-gray-300 mb-6">{essay.message || "Bạn cần đăng nhập và đăng ký để xem toàn bộ nội dung này."}</p>
+                  )}
+
+                  {!isAuthenticated ? (
+                    <div className="space-y-3">
+                        <p className="text-gray-300">Vui lòng đăng nhập để có thể đăng ký xem bài luận này.</p>
+                        <Button onClick={() => navigate('/login', { state: { from: location } })} className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold transition-transform hover:scale-105">
+                            Đăng Nhập
+                        </Button>
+                        <span className="block sm:inline mx-2 my-2 sm:my-0 text-gray-400">hoặc</span>
+                        <Button onClick={() => navigate('/register', { state: { from: location } })} variant="outline" className="w-full sm:w-auto border-yellow-400 text-yellow-400 hover:bg-yellow-400 hover:text-gray-900 font-semibold transition-transform hover:scale-105">
+                            Đăng Ký Mới
+                        </Button>
                     </div>
-                     <div className="flex items-center flex-shrink-0 ml-4">
-                        {renderAudioPlayer(essay.audioFiles?.[3])}
+                  ) : (
+                    <div className="mt-4 space-y-3">
+                      {essay.subscriptionStatus !== 'full_access' && essay.subscriptionStatus !== 'subscribed_specific' && (
+                        <Button onClick={() => handleSubscribeEssay(essay._id)} className="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white font-semibold transition-transform hover:scale-105">
+                          Đăng ký bài luận này
+                        </Button>
+                      )}
+                      {essay.subscriptionStatus !== 'full_access' && (
+                        <Button onClick={handleSubscribeFullAccess} className="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white font-semibold transition-transform hover:scale-105">
+                          Đăng ký Full Access
+                        </Button>
+                      )}
+                       {essay.subscriptionStatus === 'subscribed_specific' && (
+                        <p className="text-green-400 text-sm mt-2">Bạn đã đăng ký bài luận này.</p>
+                      )}
+                       {essay.subscriptionStatus === 'full_access' && (
+                        <p className="text-blue-400 text-sm mt-2">Bạn đã có quyền truy cập toàn bộ.</p>
+                      )}
                     </div>
-                  </summary>
-                  <div
-                    className="mt-2 p-3 px-8 bg-gray-700/30 rounded prose prose-invert prose-lg max-w-none text-gray-200 text-justify"
-                    style={{ lineHeight: '1.85', fontSize: '1.1rem' }}
-                    dangerouslySetInnerHTML={{ __html: essay.essay3 }}
-                  />
-                </details>
+                  )}
+                </div>
               )}
             </article>
+            <div className="mt-12 pt-6 border-t border-gray-700/50 text-center">
+                <Link to="/essays" className="inline-block text-yellow-400 hover:text-yellow-300 hover:underline font-semibold py-2 px-4 rounded-lg transition-colors duration-150">
+                &larr; Quay lại Thư viện Bài luận
+                </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -283,36 +380,36 @@ const SampleEssay: React.FC = () => {
         .custom-audio-controls {
           filter: invert(1) brightness(0.8) hue-rotate(180deg) saturate(0.5);
         }
-        
+
         .essay-section + .essay-section {
             margin-top: 0.5rem;
-            padding-top: 0; 
-            border-top: none; 
+            padding-top: 0;
+            border-top: none;
         }
-        
+
         summary {
-          list-style: none; 
+          list-style: none;
         }
         summary::-webkit-details-marker {
-          display: none; 
+          display: none;
         }
         summary::marker {
-          display: none; 
+          display: none;
         }
 
         .disclosure-arrow {
           transition: transform 0.2s ease-in-out;
-          display: inline-block; 
+          display: inline-block;
         }
         details summary div.group-hover\\:text-yellow-300 h2,
         details summary div.group-hover\\:text-yellow-300 .disclosure-arrow {
             color: #fef08a !important;
         }
         details summary h2 {
-             color: #fde047; 
+             color: #fde047;
         }
         details summary .disclosure-arrow {
-             color: #fde047; 
+             color: #fde047;
         }
 
         details[open] > summary .disclosure-arrow {
@@ -320,34 +417,34 @@ const SampleEssay: React.FC = () => {
         }
 
         details[open] > summary.summary-interactive {
-          background-color: rgba(42, 42, 51, 0.5); 
+          background-color: rgba(42, 42, 51, 0.5);
         }
 
         .prose-invert {
-            --tw-prose-body: #d1d5db; 
-            --tw-prose-headings: #ffffff; 
-            --tw-prose-lead: #9ca3af; 
-            --tw-prose-links: #fde047; 
-            --tw-prose-bold: #ffffff; 
-            --tw-prose-counters: #9ca3af; 
-            --tw-prose-bullets: #4b5563; 
-            --tw-prose-hr: #374151; 
-            --tw-prose-quotes: #e5e7eb; 
-            --tw-prose-quote-borders: #374151; 
-            --tw-prose-captions: #9ca3af; 
-            --tw-prose-code: #ffffff; 
-            --tw-prose-pre-code: #d1d5db; 
-            --tw-prose-pre-bg: #1f2937; 
-            --tw-prose-th-borders: #4b5563; 
-            --tw-prose-td-borders: #374151; 
+            --tw-prose-body: #d1d5db;
+            --tw-prose-headings: #ffffff;
+            --tw-prose-lead: #9ca3af;
+            --tw-prose-links: #fde047;
+            --tw-prose-bold: #ffffff;
+            --tw-prose-counters: #9ca3af;
+            --tw-prose-bullets: #4b5563;
+            --tw-prose-hr: #374151;
+            --tw-prose-quotes: #e5e7eb;
+            --tw-prose-quote-borders: #374151;
+            --tw-prose-captions: #9ca3af;
+            --tw-prose-code: #ffffff;
+            --tw-prose-pre-code: #d1d5db;
+            --tw-prose-pre-bg: #1f2937;
+            --tw-prose-th-borders: #4b5563;
+            --tw-prose-td-borders: #374151;
         }
         .prose-invert a { color: var(--tw-prose-links); }
         .prose-invert strong { color: var(--tw-prose-bold); }
-        body { 
-          font-family: 'Inter', sans-serif; 
+        body {
+          font-family: 'Inter', sans-serif;
         }
-        .font-heading { 
-          font-family: 'Georgia', serif; 
+        .font-heading {
+          font-family: 'Georgia', serif;
         }
       `}</style>
     </Layout>
