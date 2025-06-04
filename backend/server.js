@@ -3,55 +3,56 @@ import dotenv from 'dotenv';
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
-import passport from 'passport'; // <<<< KHÔI PHỤC LẠI
-import initializePassport from './config/passportConfig.js'; // <<<< KHÔI PHỤC LẠI
+import passport from 'passport';
+import initializePassport from './config/passportConfig.js';
 
 // Import Routes
 import essayRoutes from './routes/essayRoutes.js';
 import topicRoutes from './routes/topicRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
-import authRoutes from './routes/authRoutes.js'; // <<<< KHÔI PHỤC LẠI
-import subscriptionRoutes from './routes/subscriptionRoutes.js'; // <<<< KHÔI PHỤC LẠI
+import authRoutes from './routes/authRoutes.js';
+import subscriptionRoutes from './routes/subscriptionRoutes.js';
 
-// Cloudinary - Bạn có thể giữ lại nếu cần cấu hình global hoặc đã loại bỏ nếu chỉ dùng trong routes
-import { v2 as cloudinary } from 'cloudinary'; // <<<< KHÔI PHỤC LẠI (nếu cần thiết ở đây)
+import { v2 as cloudinary } from 'cloudinary';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5050;
 
-// Cấu hình Cloudinary (nếu bạn cần cấu hình ở đây thay vì trong các file route riêng lẻ)
-// Đảm bảo các biến môi trường CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET đã được set trong .env
+// Cấu hình Cloudinary (nếu bạn cần cấu hình ở đây)
 if (process.env.CLOUDINARY_URL || (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)) {
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET,
-    secure: true, // Sử dụng https
+    secure: true,
   });
   console.log("✅ Cloudinary configured via server.js");
 } else {
   console.warn("⚠️ Cloudinary configuration not found in .env. Uploads might fail if not configured elsewhere.");
 }
 
-
 // Cấu hình CORS
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:8080', // Hoặc port của React dev server của bạn (3000, 5173, etc.)
-  'https://essay-web-1.onrender.com',
-  'https://vercel.com/tonys-projects-fa0649a2/essay-web'
-  // Thêm các origin khác nếu cần
-];
+  process.env.FRONTEND_URL_VERCEL, // <<<< Biến môi trường cho URL Vercel của bạn
+  process.env.FRONTEND_URL_LOCAL || 'http://localhost:5173', // Hoặc port local dev của bạn (ví dụ 3000, 8080)
+  'https://essay-web-1.onrender.com', // URL của chính backend trên Render (nếu cần)
+  // Thêm các URL preview của Vercel nếu bạn thường xuyên dùng và muốn test
+].filter(Boolean); // Loại bỏ các giá trị undefined/null
+
+console.log("Allowed Origins for CORS:", allowedOrigins); // Log ra để kiểm tra
+
 const corsOptions = {
   origin: function (origin, callback) {
-    if (!origin && process.env.NODE_ENV !== 'production') { // Cho phép request không có origin (Postman, mobile apps) trong dev
-        return callback(null, true);
-    }
-    if (allowedOrigins.some(allowed => origin && origin.startsWith(allowed))) {
+    // Nếu không có origin (ví dụ: Postman trong một số trường hợp, hoặc server-to-server)
+    // hoặc nếu origin nằm trong danh sách cho phép.
+    // Trong production, bạn có thể muốn chặt chẽ hơn với việc !origin
+    if (!origin || allowedOrigins.includes(origin)) {
+      // console.log(`Allowing origin: ${origin}`); // Bật log này nếu cần debug kỹ
       callback(null, true);
     } else {
-      console.error('Blocked by CORS:', origin);
+      console.error(`Blocked by CORS. Origin: ${origin}. Allowed origins:`, allowedOrigins);
       callback(new Error('Not allowed by CORS'));
     }
   },
@@ -66,7 +67,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Khởi tạo và cấu hình Passport <<<< KHÔI PHỤC LẠI
+// Khởi tạo và cấu hình Passport
 app.use(passport.initialize());
 initializePassport(passport);
 
@@ -76,8 +77,8 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(error => console.error("❌ MongoDB Atlas connection error:", error.message));
 
 // Định tuyến (API Routes)
-app.use('/api/auth', authRoutes);                   // <<<< KHÔI PHỤC LẠI
-app.use('/api/subscriptions', subscriptionRoutes);  // <<<< KHÔI PHỤC LẠI
+app.use('/api/auth', authRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/essays', essayRoutes);
 app.use('/api/topics', topicRoutes);
 app.use('/api/categories', categoryRoutes);
