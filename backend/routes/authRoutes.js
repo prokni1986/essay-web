@@ -3,7 +3,7 @@ import express from 'express';
 import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import authenticateToken from '../config/authMiddleware.js'; // <<<< ĐẢM BẢO IMPORT ĐÚNG ĐƯỜNG DẪN
+import authenticateToken from '../config/authMiddleware.js'; // Đảm bảo đường dẫn này chính xác
 
 const router = express.Router();
 
@@ -51,8 +51,7 @@ router.post('/register', async (req, res) => {
 
   } catch (err) {
     console.error("Register error:", err);
-    // Phân tích lỗi cụ thể hơn nếu là lỗi từ Mongoose (ví dụ: duplicate key)
-    if (err.code === 11000) { // Lỗi duplicate key của MongoDB
+    if (err.code === 11000) {
         const field = Object.keys(err.keyValue)[0];
         errors.push({ msg: `Giá trị '${err.keyValue[field]}' cho trường '${field}' đã tồn tại.` });
         return res.status(400).json({ errors });
@@ -66,10 +65,10 @@ router.post('/login', (req, res, next) => {
   passport.authenticate('local', { session: false }, (err, user, info) => {
     if (err) {
       console.error("Login passport authenticate error:", err);
-      return next(err);
+      return next(err); // Nên để Express xử lý lỗi này
     }
     if (!user) {
-      return res.status(401).json({ message: info.message || 'Đăng nhập thất bại.' });
+      return res.status(401).json({ message: info ? info.message : 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.' });
     }
     const payload = {
       id: user.id,
@@ -77,12 +76,17 @@ router.post('/login', (req, res, next) => {
       email: user.email,
       // roles: user.roles // nếu có
     };
+    // Đảm bảo JWT_SECRET đã được định nghĩa trong biến môi trường
+    if (!process.env.JWT_SECRET) {
+        console.error("Lỗi nghiêm trọng: JWT_SECRET chưa được định nghĩa!");
+        return res.status(500).json({ message: "Lỗi cấu hình máy chủ." });
+    }
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     res.json({
       message: 'Đăng nhập thành công!',
-      token: `Bearer ${token}`,
-      user: {
+      token: `Bearer ${token}`, // Gửi token về client với tiền tố Bearer
+      user: { // Gửi thông tin user (không bao gồm mật khẩu)
         id: user.id,
         username: user.username,
         email: user.email,
@@ -93,15 +97,16 @@ router.post('/login', (req, res, next) => {
 });
 
 
-// 3. Lấy thông tin người dùng hiện tại <<<< BỎ COMMENT VÀ SỬA
-router.get('/me', authenticateToken, async (req, res) => { // Bỏ comment dòng này
-  // req.user đã được gán bởi middleware authenticateToken và đã được select('-password')
-  if (!req.user) {
-    // Dòng này gần như sẽ không bao giờ được thực thi nếu authenticateToken làm việc đúng
-    // vì middleware sẽ trả về lỗi trước nếu user không tìm thấy hoặc token không hợp lệ.
-    return res.status(404).json({ message: "Không tìm thấy thông tin người dùng từ token." });
-  }
-  res.status(200).json({ user: req.user }); // Trả về user
+// 3. Lấy thông tin người dùng hiện tại (đã đăng nhập)
+// Route này sẽ được gọi bởi frontend khi ứng dụng tải lần đầu để xác thực token
+// và lấy thông tin user nếu token còn hợp lệ.
+router.get('/me', authenticateToken, async (req, res) => {
+  // Middleware `authenticateToken` đã chạy trước:
+  // - Nếu token không hợp lệ hoặc thiếu, nó đã trả về lỗi 401 hoặc 403.
+  // - Nếu token hợp lệ, nó đã tìm user, loại bỏ password và gán vào `req.user`.
+
+  // Do đó, nếu request đến được đây, `req.user` chắc chắn tồn tại và hợp lệ.
+  res.status(200).json({ user: req.user });
 });
 
 export default router;

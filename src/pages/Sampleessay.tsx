@@ -53,11 +53,11 @@ const SampleEssay: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const { isAuthenticated, isLoading: authIsLoading } = useAuth(); // Bỏ 'user' nếu không dùng trực tiếp ở đây
+  const { isAuthenticated, isLoading: authIsLoading } = useAuth(); // Đã bỏ 'user' nếu không dùng trực tiếp
   const navigate = useNavigate();
   const location = useLocation();
 
-  const fetchEssay = useCallback(async () => {
+  const fetchEssay = useCallback(async () => { // Đã dùng useCallback
     if (!id) {
       setError('ID bài luận không hợp lệ.');
       setLoading(false);
@@ -74,7 +74,7 @@ const SampleEssay: React.FC = () => {
         if (err.response?.status === 404) {
             setError('Không tìm thấy bài luận được yêu cầu.');
         } else {
-            const errorData = err.response?.data as ApiErrorResponse;
+            const errorData = err.response?.data as ApiErrorResponse; // Type assertion
             setError(errorData?.message || 'Không thể tải chi tiết bài luận. Vui lòng thử lại sau.');
         }
       } else {
@@ -83,14 +83,14 @@ const SampleEssay: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id]); // Dependency là id
 
   useEffect(() => {
     fetchEssay();
-  }, [fetchEssay]);
+  }, [fetchEssay]); // Dependency là fetchEssay (đã được useCallback ổn định)
 
 
-  const handleSubscribeEssay = async (essayId: string) => {
+  const handleSubscribeEssay = async (essayId: string) => { // Đã có
     if (!isAuthenticated) {
       toast.error("Vui lòng đăng nhập để đăng ký bài luận.");
       navigate('/login', { state: { from: location } });
@@ -99,8 +99,8 @@ const SampleEssay: React.FC = () => {
     try {
       const response = await axiosInstance.post<{ message: string }>(`/api/subscriptions/essay/${essayId}`);
       toast.success(response.data.message || "Đăng ký bài luận thành công!");
-      fetchEssay(); // Tải lại để cập nhật trạng thái
-    } catch (error) {
+      fetchEssay();
+    } catch (error) { // Xử lý lỗi với type assertion
       if (axios.isAxiosError(error)) {
         const errorData = error.response?.data as ApiErrorResponse;
         toast.error(errorData?.message || "Lỗi khi đăng ký bài luận.");
@@ -111,7 +111,7 @@ const SampleEssay: React.FC = () => {
     }
   };
 
-  const handleSubscribeFullAccess = async () => {
+  const handleSubscribeFullAccess = async () => { // Đã có
      if (!isAuthenticated) {
       toast.error("Vui lòng đăng nhập để đăng ký gói.");
       navigate('/login', { state: { from: location } });
@@ -120,8 +120,8 @@ const SampleEssay: React.FC = () => {
     try {
       const response = await axiosInstance.post<{ message: string }>(`/api/subscriptions/full-access`);
       toast.success(response.data.message || "Đăng ký gói Full Access thành công!");
-      fetchEssay(); // Tải lại để cập nhật trạng thái
-    } catch (error) {
+      fetchEssay();
+    } catch (error) { // Xử lý lỗi với type assertion
       if (axios.isAxiosError(error)) {
         const errorData = error.response?.data as ApiErrorResponse;
         toast.error(errorData?.message || "Lỗi khi đăng ký gói Full Access.");

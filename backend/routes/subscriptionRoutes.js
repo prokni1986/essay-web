@@ -52,33 +52,27 @@ router.post('/essay/:essayId', authenticateToken, async (req, res) => {
 // 2. Subscribe quyền truy cập toàn bộ
 router.post('/full-access', authenticateToken, async (req, res) => {
   const userId = req.user.id;
-
   try {
-    // Kiểm tra xem đã có full access chưa
-    const existingFullAccess = await UserSubscription.findOne({ user: userId, hasFullAccess: true, isActive: true });
+    const existingFullAccess = await UserSubscription.findOne({ user: userId, hasFullAccess: true, isActive: true }); // Kiểm tra cả isActive
     if (existingFullAccess) {
+      // Nếu đã có và đang active, trả về 400
       return res.status(400).json({ message: "Bạn đã có quyền truy cập toàn bộ rồi." });
     }
 
-    // TODO: Xử lý thanh toán nếu cần.
-    // Tạo subscription full access
+    // Nếu không có bản ghi active nào, hoặc unique index (đã sửa) cho phép, tạo mới
     const newFullSubscription = new UserSubscription({
       user: userId,
       hasFullAccess: true,
-      planType: 'full_access_free', // Ví dụ
-      // endDate: ...
+      planType: 'full_access_free', // Hoặc loại plan phù hợp
+      isActive: true // Mặc định là active
     });
     await newFullSubscription.save();
-
-    // (Tùy chọn) Hủy các subscription lẻ trước đó nếu người dùng nâng cấp lên full access
-    // await UserSubscription.updateMany({ user: userId, subscribedEssay: { $ne: null }, isActive: true }, { isActive: false });
-
     res.status(201).json({ message: "Đăng ký quyền truy cập toàn bộ thành công!", subscription: newFullSubscription });
 
   } catch (error) {
     console.error("Error subscribing to full access:", error);
-     if (error.code === 11000) {
-         return res.status(400).json({ message: "Bạn đã có một gói đăng ký tương tự đang hoạt động." });
+    if (error.code === 11000) { // Lỗi duplicate key từ MongoDB
+      return res.status(400).json({ message: "Lỗi: Bạn đã có một gói đăng ký tương tự đang hoạt động hoặc đã tồn tại (Duplicate Key)." });
     }
     res.status(500).json({ message: "Lỗi máy chủ khi đăng ký gói full access." });
   }

@@ -40,8 +40,14 @@ const UserSubscriptionSchema = new mongoose.Schema({
 // Đảm bảo một user không subscribe cùng một bài luận nhiều lần (nếu không có thời hạn khác nhau)
 // Hoặc chỉ có một bản ghi full_access (nếu không quản lý theo thời gian)
 // Cần xem xét kỹ logic unique của bạn. Ví dụ:
-UserSubscriptionSchema.index({ user: 1, subscribedEssay: 1 }, { unique: true, partialFilterExpression: { subscribedEssay: { $ne: null } } });
-UserSubscriptionSchema.index({ user: 1, hasFullAccess: 1 }, { unique: true, partialFilterExpression: { hasFullAccess: true } });
+UserSubscriptionSchema.index(
+  { user: 1, subscribedEssay: 1 },
+  { unique: true, partialFilterExpression: { subscribedEssay: { $ne: null }, isActive: true } }
+);
+UserSubscriptionSchema.index(
+  { user: 1, hasFullAccess: 1 },
+  { unique: true, partialFilterExpression: { hasFullAccess: true, isActive: true } }
+);
 
 
 const UserSubscription = mongoose.model('UserSubscription', UserSubscriptionSchema);
