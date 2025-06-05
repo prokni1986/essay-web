@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import AdminUserSubscriptionsPage from './pages/AdminUserSubscriptionsPage'; // THÊM MỚI
 
 // Import các Pages và Components hiện có
 import Index from "./pages/Index";
@@ -64,7 +65,7 @@ const App = () => (
               <Route path="/admin-dashboard" element={<AdminDashboard />} />
               <Route path="/admin-topics" element={<AdminTopics />} />
               <Route path="/admin-categories" element={<AdminCategories />} />
-
+              <Route path="/admin/users-subscriptions" element={<AdminUserSubscriptionsPage />} /> {/* <<<< THÊM MỚI */}
               {/* (Tùy chọn) Các route khác cần đăng nhập cho người dùng thường */}
               {/* <Route path="/profile" element={<UserProfilePage />} /> */}
               {/* <Route path="/my-subscriptions" element={<MySubscriptionsPage />} /> */}
