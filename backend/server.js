@@ -12,7 +12,7 @@ import topicRoutes from './routes/topicRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
-
+import adminRoutes from './routes/adminRoutes.js'; // THÊM MỚI
 import { v2 as cloudinary } from 'cloudinary';
 
 dotenv.config();
@@ -82,7 +82,7 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/essays', essayRoutes);
 app.use('/api/topics', topicRoutes);
 app.use('/api/categories', categoryRoutes);
-
+app.use('/api/admin', adminRoutes); // <<<< THÊM MỚI
 // Route cơ bản để kiểm tra server
 app.get('/', (req, res) => {
   res.send('Essay Web API is running with Authentication! 🚀');
