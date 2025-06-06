@@ -1,8 +1,9 @@
 // file: components/Footer.tsx
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext'; // <<<< THÊM IMPORT useAuth
 
-// SVG Icons (Ví dụ, bạn có thể dùng thư viện icon hoặc SVG tùy chỉnh)
+// SVG Icons (Giữ nguyên)
 const TiktokIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
     <path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z"/>
@@ -27,13 +28,19 @@ const InstagramIcon = () => (
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
-  
+  // <<<< THÊM MỚI: Lấy thông tin xác thực từ AuthContext
+  const { isAuthenticated, user } = useAuth();
+
+  // <<<< THÊM MỚI: Xác định xem người dùng có phải là admin không
+  // Đảm bảo bạn đã đặt biến VITE_ADMIN_EMAIL trong file .env của frontend
+  const isAdmin = isAuthenticated && user?.email === import.meta.env.VITE_ADMIN_EMAIL;
+
   const footerLinkClasses = "text-light/70 hover:text-highlight transition-colors duration-200 text-sm";
   const socialLinkClasses = "text-light/70 hover:text-highlight transition-colors duration-200 flex items-center space-x-2";
-  const headingClasses = "text-lg font-semibold mb-5 text-light"; // Tăng font-weight và mb
+  const headingClasses = "text-lg font-semibold mb-5 text-light";
 
   return (
-    <footer className="bg-dark border-t border-muted/20 py-16 px-6 md:px-10"> {/* Tăng py */}
+    <footer className="bg-dark border-t border-muted/20 py-16 px-6 md:px-10">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 lg:gap-16">
           {/* About Section */}
@@ -42,36 +49,50 @@ const Footer = () => {
               Thi Điểm Cao<span className="text-highlight">.</span>
             </Link>
             <p className="text-light/70 mt-3 text-base leading-relaxed max-w-md">
-              Cùng con ôn tập môn Ngữ Văn và Tiếng Anh để đạt điểm cao trong kỳ thi tốt nghiệp. 
+              Cùng con ôn tập môn Ngữ Văn và Tiếng Anh để đạt điểm cao trong kỳ thi tốt nghiệp.
               Nền tảng cung cấp tài liệu chất lượng và phương pháp học tập hiệu quả.
             </p>
           </div>
-          
+
           {/* Links Section */}
           <div>
             <h3 className={headingClasses}>Liên Kết Nhanh</h3>
-            <ul className="space-y-3"> {/* Tăng space-y */}
+            <ul className="space-y-3">
               <li><Link to="/" className={footerLinkClasses}>Trang chủ</Link></li>
-              <li><Link to="/alltopic" className={footerLinkClasses}>Ngữ Văn</Link></li> {/* Sửa link */}
+              <li><Link to="/alltopic" className={footerLinkClasses}>Ngữ Văn</Link></li>
               <li><Link to="/gigs" className={footerLinkClasses}>Tiếng Anh</Link></li>
-              <li><Link to="/essays" className={footerLinkClasses}>Bài Văn Mẫu</Link></li> {/* Thêm link */}
+              <li><Link to="/essays" className={footerLinkClasses}>Bài Văn Mẫu</Link></li>
               <li><Link to="/about" className={footerLinkClasses}>Liên hệ</Link></li>
               <li><Link to="/contact" className={footerLinkClasses}>Hỗ trợ</Link></li>
             </ul>
           </div>
-          
-          {/* Social Media Section */}
+
+          {/* Social Media & Admin Section */}
           <div>
-            <h3 className={headingClasses}>Kết Nối Với Chúng Tôi</h3>
+            <h3 className={headingClasses}>Kết Nối & Quản trị</h3>
             <ul className="space-y-3">
               <li><a href="https://tiktok.com" target="_blank" rel="noopener noreferrer" className={socialLinkClasses}><TiktokIcon /><span className="ml-2">Tiktok</span></a></li>
-              <li><a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" className={socialLinkClasses}><YoutubeIcon /><span className="ml-2">Youtube</span></a></li> {/* Sửa link youtube */}
+              <li><a href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer" className={socialLinkClasses}><YoutubeIcon /><span className="ml-2">Youtube</span></a></li>
               <li><a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className={socialLinkClasses}><FacebookIcon /><span className="ml-2">Facebook</span></a></li>
               <li><a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className={socialLinkClasses}><InstagramIcon /><span className="ml-2">Instagram</span></a></li>
+
+              {/* <<<< THÊM MỚI: Chỉ hiển thị các link admin nếu người dùng là admin */}
+              {isAdmin && (
+                <>
+                  <li className="pt-4 mt-4 border-t border-muted/20">
+                    <p className="text-highlight font-semibold text-sm">Bảng điều khiển Admin</p>
+                  </li>
+                  <li><Link to="/admin-dashboard" className={footerLinkClasses}>Dashboard</Link></li>
+                  <li><Link to="/admin-upload" className={footerLinkClasses}>Upload Bài luận</Link></li>
+                  <li><Link to="/admin-topics" className={footerLinkClasses}>Quản lý Chủ đề</Link></li>
+                  <li><Link to="/admin-categories" className={footerLinkClasses}>Quản lý Chuyên mục</Link></li>
+                  <li><Link to="/admin-user-subscriptions" className={footerLinkClasses}>Quản lý Users</Link></li>
+                </>
+              )}
             </ul>
           </div>
         </div>
-        
+
         {/* Bottom Bar */}
         <div className="border-t border-muted/20 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-light/50 text-sm">© {currentYear} Thi Điểm Cao. Bảo lưu mọi quyền.</p>
