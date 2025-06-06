@@ -20,7 +20,7 @@ import EssaysByTopic from './pages/EssaysByTopic';
 import AllTopics from './pages/alltopic';
 import AllEssaysPage from './pages/AllEssaysPage'; // Trang danh sách tất cả bài luận
 import EssaysByCategoryPage from './pages/EssaysByCategoryPage';
-
+import MyAccountPage from './pages/MyAccountPage'; // <<<< THÊM IMPORT
 // THÊM MỚI: Import cho Authentication
 import { AuthProvider } from './contexts/AuthContext'; // Đường dẫn tới AuthContext của bạn
 import LoginPage from './pages/LoginPage'; // Trang Đăng nhập
@@ -56,19 +56,20 @@ const App = () => (
             {/* Authentication Routes - Các route cho đăng nhập và đăng ký */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
-            <Route path="/admin-dashboard" element={<AdminDashboard />} />
+            
             {/* Protected Routes - Các route yêu cầu người dùng phải đăng nhập */}
             {/* Sử dụng <ProtectedRoute /> để bọc các Route con cần bảo vệ */}
             <Route element={<ProtectedRoute />}>
               {/* Admin Routes */}
               <Route path="/admin-upload" element={<AdminUpload />} />
-              
+              <Route path="/admin-dashboard" element={<AdminDashboard />} />
               <Route path="/admin-topics" element={<AdminTopics />} />
               <Route path="/admin-categories" element={<AdminCategories />} />
               <Route path="/admin-user-subscriptions" element={<AdminUserSubscriptionsPage />} /> {/* THÊM MỚI: Trang quản lý subscriptions của người dùng */}
               {/* (Tùy chọn) Các route khác cần đăng nhập cho người dùng thường */}
               {/* <Route path="/profile" element={<UserProfilePage />} /> */}
               {/* <Route path="/my-subscriptions" element={<MySubscriptionsPage />} /> */}
+              <Route path="/my-account" element={<MyAccountPage />} />
             </Route>
 
             {/* Not Found Route - Route cho các đường dẫn không khớp */}
