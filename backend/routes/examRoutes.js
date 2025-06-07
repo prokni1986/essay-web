@@ -30,3 +30,5 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
 
     } catch (err) { /* ... */ }
 });
+
+export default router;
