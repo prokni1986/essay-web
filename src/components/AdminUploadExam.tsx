@@ -11,17 +11,20 @@ import { Pencil, Trash2, XCircle } from 'lucide-react';
 // =================================================================================
 // CẤU HÌNH AXIOS VÀ INTERCEPTOR XÁC THỰC
 // =================================================================================
-// Khởi tạo một axios instance để sử dụng trong component này.
+// FIX: Định nghĩa axiosInstance trực tiếp trong file để loại bỏ lỗi import.
+// Điều này giúp component hoạt động độc lập mà không cần file cấu hình bên ngoài.
 const axiosInstance = axios.create();
 
 // Interceptor sẽ tự động đính kèm token xác thực (nếu có) vào mỗi yêu cầu.
 // Logic đăng nhập của bạn cần lưu token vào localStorage với key là 'authToken'.
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      // Đính kèm token vào header Authorization.
-      config.headers.Authorization = `Bearer ${token}`;
+    // Chỉ thêm token cho các yêu cầu API, không phải các yêu cầu file tĩnh.
+    if (config.url && config.url.startsWith('/api')) {
+        const token = localStorage.getItem('authToken');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
     }
     return config;
   },
@@ -81,9 +84,8 @@ const AdminUploadExam: React.FC = () => {
       
       let examsData = response.data;
 
-      // FIX: Xử lý trường hợp dữ liệu là một object chứa một mảng bên trong
+      // Xử lý trường hợp dữ liệu là một object chứa một mảng bên trong
       if (!Array.isArray(examsData) && typeof examsData === 'object' && examsData !== null) {
-        // Tìm kiếm mảng trong các key phổ biến
         if (Array.isArray(examsData.data)) {
             examsData = examsData.data;
         } else if (Array.isArray(examsData.exams)) {
@@ -97,15 +99,14 @@ const AdminUploadExam: React.FC = () => {
         const sortedExams = examsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setExams(sortedExams);
       } else {
-        // Nếu vẫn không phải là mảng, báo lỗi chi tiết hơn
         const receivedDataType = typeof response.data;
-        const receivedDataKeys = receivedDataType === 'object' && response.data !== null ? Object.keys(response.data).join(', ') : 'N/A';
-        throw new Error(`Dữ liệu trả về không phải là một mảng. Kiểu nhận được: ${receivedDataType}. Các keys (nếu là object): [${receivedDataKeys}]`);
+        const receivedDataInfo = receivedDataType === 'object' && response.data !== null ? `Keys: [${Object.keys(response.data).join(', ')}]` : `Value: ${String(response.data).substring(0, 100)}...`;
+        throw new Error(`Dữ liệu trả về không phải là một mảng. Kiểu nhận được: ${receivedDataType}. ${receivedDataInfo}`);
       }
     } catch (error) {
       let errorMessage = 'Không thể tải danh sách đề thi.';
       if (error instanceof Error) {
-        errorMessage = error.message; // Sử dụng lỗi chi tiết từ khối try
+        errorMessage = error.message; 
       } else if (axios.isAxiosError(error)) {
         if (error.response?.status === 401 || error.response?.status === 403) {
             errorMessage = 'Lỗi xác thực: Bạn không có quyền truy cập hoặc phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
@@ -120,7 +121,6 @@ const AdminUploadExam: React.FC = () => {
     }
   }, []);
 
-  // Lấy danh sách đề thi khi component được render
   useEffect(() => {
     fetchExams();
   }, [fetchExams]);
@@ -159,16 +159,14 @@ const AdminUploadExam: React.FC = () => {
 
     try {
       if (editingExam) {
-        // Cập nhật đề thi
         await axiosInstance.put(`/api/exams/${editingExam._id}`, examData);
         toast.success('Cập nhật đề thi thành công!');
       } else {
-        // Tạo đề thi mới
         await axiosInstance.post('/api/exams/create-html-post', examData);
         toast.success('Lưu đề thi thành công!');
       }
       resetForm();
-      fetchExams(); // Tải lại danh sách sau khi submit thành công
+      fetchExams();
     } catch (error) {
       const errorMessage = 'Thao tác thất bại.';
       toast.error(errorMessage);
@@ -186,7 +184,7 @@ const AdminUploadExam: React.FC = () => {
       await axiosInstance.delete(`/api/exams/${deleteConfirm._id}`);
       toast.success('Đã xóa đề thi thành công!');
       setDeleteConfirm(null);
-      fetchExams(); // Tải lại danh sách
+      fetchExams();
     } catch (error) {
       toast.error('Xóa đề thi thất bại.');
       console.error("Delete error:", error);
@@ -198,7 +196,6 @@ const AdminUploadExam: React.FC = () => {
   // === RENDER FUNCTION ===
   return (
     <div className="p-4 md:p-8 text-white bg-gray-900 rounded-lg space-y-12">
-      {/* --- Section Form --- */}
       <section>
         <h1 className="text-3xl font-bold mb-4">{editingExam ? 'Chỉnh Sửa Đề Thi' : 'Tạo Đề Thi Mới'}</h1>
         <p className="text-sm text-gray-400 mb-6">
@@ -244,7 +241,6 @@ const AdminUploadExam: React.FC = () => {
         </form>
       </section>
 
-      {/* --- Section Danh sách đề thi --- */}
       <section>
         <h2 className="text-3xl font-bold mb-6 border-t border-gray-700 pt-8">Quản Lý Đề Thi</h2>
         {isFetching ? (
@@ -278,7 +274,6 @@ const AdminUploadExam: React.FC = () => {
         )}
       </section>
 
-      {/* --- Modal Xác Nhận Xóa --- */}
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-lg p-6 shadow-xl max-w-sm w-full border border-gray-700">
