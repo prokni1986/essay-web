@@ -12,7 +12,6 @@ import { Pencil, Trash2, XCircle } from 'lucide-react';
 // CẤU HÌNH AXIOS VÀ INTERCEPTOR XÁC THỰC
 // =================================================================================
 // Khởi tạo một axios instance để sử dụng trong component này.
-// FIX: Định nghĩa axiosInstance trực tiếp thay vì import để giải quyết lỗi đường dẫn.
 const axiosInstance = axios.create();
 
 // Interceptor sẽ tự động đính kèm token xác thực (nếu có) vào mỗi yêu cầu.
@@ -78,22 +77,38 @@ const AdminUploadExam: React.FC = () => {
     setIsFetching(true);
     setApiError(null);
     try {
-      // Sử dụng axiosInstance đã định nghĩa ở trên để tự động có header xác thực
       const response = await axiosInstance.get('/api/exams');
       
-      if (Array.isArray(response.data)) {
-        const sortedExams = response.data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      let examsData = response.data;
+
+      // FIX: Xử lý trường hợp dữ liệu là một object chứa một mảng bên trong
+      if (!Array.isArray(examsData) && typeof examsData === 'object' && examsData !== null) {
+        // Tìm kiếm mảng trong các key phổ biến
+        if (Array.isArray(examsData.data)) {
+            examsData = examsData.data;
+        } else if (Array.isArray(examsData.exams)) {
+            examsData = examsData.exams;
+        } else if (Array.isArray(examsData.results)) {
+            examsData = examsData.results;
+        }
+      }
+      
+      if (Array.isArray(examsData)) {
+        const sortedExams = examsData.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setExams(sortedExams);
       } else {
-        throw new Error("Dữ liệu trả về không phải là một mảng.");
+        // Nếu vẫn không phải là mảng, báo lỗi chi tiết hơn
+        const receivedDataType = typeof response.data;
+        const receivedDataKeys = receivedDataType === 'object' && response.data !== null ? Object.keys(response.data).join(', ') : 'N/A';
+        throw new Error(`Dữ liệu trả về không phải là một mảng. Kiểu nhận được: ${receivedDataType}. Các keys (nếu là object): [${receivedDataKeys}]`);
       }
     } catch (error) {
       let errorMessage = 'Không thể tải danh sách đề thi.';
-      if (axios.isAxiosError(error)) {
+      if (error instanceof Error) {
+        errorMessage = error.message; // Sử dụng lỗi chi tiết từ khối try
+      } else if (axios.isAxiosError(error)) {
         if (error.response?.status === 401 || error.response?.status === 403) {
             errorMessage = 'Lỗi xác thực: Bạn không có quyền truy cập hoặc phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-        } else if (typeof error.response?.data?.message === 'string') {
-            errorMessage = error.response.data.message;
         }
       }
       setApiError(errorMessage);
