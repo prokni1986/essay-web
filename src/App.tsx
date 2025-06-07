@@ -26,7 +26,9 @@ import { AuthProvider } from './contexts/AuthContext'; // Đường dẫn tới 
 import LoginPage from './pages/LoginPage'; // Trang Đăng nhập
 import RegisterPage from './pages/RegisterPage'; // Trang Đăng ký
 import ProtectedRoute from './components/auth/ProtectedRoute'; // Component bảo vệ Route
-
+import AdminExamUpload from './components/AdminExamUpload'; // << Dòng mới
+import AllExamsPage from './pages/AllExamsPage'; // <<<< ADD THIS LINE
+import ExamPage from './pages/ExamPage'; 
 // (Tùy chọn) Import các trang cần bảo vệ khác nếu có
 // import UserProfilePage from './pages/UserProfilePage';
 // import MySubscriptionsPage from './pages/MySubscriptionsPage';
@@ -53,7 +55,10 @@ const App = () => (
             <Route path="/essays" element={<AllEssaysPage />} />
             <Route path="/category/:categoryId" element={<EssaysByCategoryPage />} />
 
+            <Route path="/exams" element={<AllExamsPage />} /> {/* <<<< THÊM MỚI */}
+            <Route path="/exam/:id" element={<ExamPage />} /> {/* <<<< THÊM MỚI */}
             {/* Authentication Routes - Các route cho đăng nhập và đăng ký */}
+            
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             
@@ -70,6 +75,7 @@ const App = () => (
               {/* <Route path="/profile" element={<UserProfilePage />} /> */}
               {/* <Route path="/my-subscriptions" element={<MySubscriptionsPage />} /> */}
               <Route path="/my-account" element={<MyAccountPage />} />
+              <Route path="/admin-exam-upload" element={<AdminExamUpload />} /> {/* << Route mới (bạn có thể đổi path cho rõ ràng hơn) */}
             </Route>
 
             {/* Not Found Route - Route cho các đường dẫn không khớp */}
