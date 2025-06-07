@@ -1,29 +1,25 @@
 // src/components/AdminUploadExam.tsx
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios'; // Cần thiết để kiểm tra lỗi axios
+import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
-import { Pencil, Trash2, XCircle } from 'lucide-react';
+import { Pencil, Trash2, XCircle, Loader2 } from 'lucide-react';
 
 // =================================================================================
 // CẤU HÌNH AXIOS VÀ INTERCEPTOR XÁC THỰC
 // =================================================================================
-// FIX: Định nghĩa axiosInstance trực tiếp trong file để loại bỏ lỗi import đường dẫn alias.
 const axiosInstance = axios.create({
   // Sửa đổi: Sử dụng URL backend từ biến môi trường của Vite.
   baseURL: import.meta.env.VITE_API_BASE_URL,
 });
 
-// Interceptor sẽ tự động đính kèm token xác thực (nếu có) vào mỗi yêu cầu.
-// Logic đăng nhập của bạn cần lưu token vào localStorage với key là 'authToken'.
 axiosInstance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('authToken');
     if (token) {
-      // Gắn token vào header Authorization.
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
@@ -36,24 +32,30 @@ axiosInstance.interceptors.request.use(
 // =================================================================================
 // CÁC ĐỊNH NGHĨA KIỂU DỮ LIỆU (TYPESCRIPT INTERFACES)
 // =================================================================================
-interface Exam {
+// Interface cho danh sách (không có htmlContent)
+interface ExamInList {
   _id: string;
   title: string;
   description?: string;
   subject: string;
   year: number;
   province?: string;
-  htmlContent: string;
   createdAt: string;
 }
+
+// Interface cho đề thi đầy đủ (có htmlContent)
+interface ExamFull extends ExamInList {
+    htmlContent: string;
+}
+
 
 // =================================================================================
 // COMPONENT CHÍNH: AdminUploadExam
 // =================================================================================
 const AdminUploadExam: React.FC = () => {
   // === STATE MANAGEMENT ===
-  const [exams, setExams] = useState<Exam[]>([]);
-  const [editingExam, setEditingExam] = useState<Exam | null>(null);
+  const [exams, setExams] = useState<ExamInList[]>([]); // Chỉ lưu danh sách tóm tắt
+  const [editingExam, setEditingExam] = useState<ExamFull | null>(null);
 
   // State cho các trường trong form
   const [title, setTitle] = useState('');
@@ -67,14 +69,18 @@ const AdminUploadExam: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<Exam | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<ExamInList | null>(null);
+
+  // State để lưu nội dung chi tiết đã được tải
+  const [fullContentCache, setFullContentCache] = useState<{ [key: string]: string }>({});
+  const [loadingContentId, setLoadingContentId] = useState<string | null>(null);
+
 
   // === API FUNCTIONS ===
   const fetchExams = useCallback(async () => {
     setIsFetching(true);
     setApiError(null);
     try {
-      // Sử dụng axiosInstance đã định nghĩa ở trên để gọi API
       const response = await axiosInstance.get('/api/exams');
       
       if (Array.isArray(response.data)) {
@@ -85,12 +91,8 @@ const AdminUploadExam: React.FC = () => {
       }
     } catch (error) {
       let errorMessage = 'Không thể tải danh sách đề thi.';
-      if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401 || error.response?.status === 403) {
-            errorMessage = 'Lỗi xác thực: Bạn không có quyền truy cập hoặc phiên đăng nhập đã hết hạn.';
-        } else {
-            errorMessage = `Lỗi từ server: ${error.message}`;
-        }
+      if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+          errorMessage = 'Lỗi xác thực: Bạn không có quyền truy cập hoặc phiên đăng nhập đã hết hạn.';
       } else if (error instanceof Error) {
         errorMessage = error.message; 
       }
@@ -107,7 +109,7 @@ const AdminUploadExam: React.FC = () => {
     fetchExams();
   }, [fetchExams]);
 
-  // === FORM HANDLERS ===
+  // === FORM & CONTENT HANDLERS ===
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -118,18 +120,29 @@ const AdminUploadExam: React.FC = () => {
     setEditingExam(null);
   };
 
-  const handleEditClick = (exam: Exam) => {
+  const handleEditClick = async (exam: ExamInList) => {
     if (editingExam?._id === exam._id) {
         resetForm();
-    } else {
-        setEditingExam(exam);
-        setTitle(exam.title);
-        setDescription(exam.description || '');
-        setSubject(exam.subject);
-        setYear(exam.year);
-        setProvince(exam.province || '');
-        setHtmlContent(exam.htmlContent);
+        return;
+    }
+    
+    // Tải nội dung đầy đủ để sửa
+    toast.info("Đang tải nội dung để chỉnh sửa...");
+    try {
+        const response = await axiosInstance.get(`/api/exams/${exam._id}`);
+        const fullExamData: ExamFull = response.data;
+        
+        setEditingExam(fullExamData);
+        setTitle(fullExamData.title);
+        setDescription(fullExamData.description || '');
+        setSubject(fullExamData.subject);
+        setYear(fullExamData.year);
+        setProvince(fullExamData.province || '');
+        setHtmlContent(fullExamData.htmlContent);
+        
         document.getElementById('exam-form-section')?.scrollIntoView({ behavior: 'smooth' });
+    } catch {
+        toast.error("Không thể tải nội dung chi tiết để sửa.");
     }
   };
 
@@ -177,6 +190,24 @@ const AdminUploadExam: React.FC = () => {
       setIsLoading(false);
     }
   };
+  
+  // === LAZY LOAD CONTENT FOR PREVIEW ===
+  const handleToggleDetails = async (examId: string, isOpen: boolean) => {
+    if (isOpen && !fullContentCache[examId] && !loadingContentId) {
+      setLoadingContentId(examId);
+      try {
+        const response = await axiosInstance.get(`/api/exams/${examId}`);
+        if (response.data?.htmlContent) {
+          setFullContentCache(prev => ({ ...prev, [examId]: response.data.htmlContent }));
+        }
+      } catch (error) {
+        toast.error('Không thể tải nội dung xem trước.');
+      } finally {
+        setLoadingContentId(null);
+      }
+    }
+  };
+
 
   // === RENDER FUNCTION ===
   return (
@@ -184,6 +215,7 @@ const AdminUploadExam: React.FC = () => {
       <section id="exam-form-section">
         <h1 className="text-3xl font-bold mb-4">{editingExam ? 'Chỉnh Sửa Đề Thi' : 'Tạo Đề Thi Mới'}</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Form fields remain the same */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <Label htmlFor="title">Tiêu đề Đề thi (*)</Label>
@@ -236,8 +268,8 @@ const AdminUploadExam: React.FC = () => {
         ) : (
           <div className="space-y-2">
             {exams.length > 0 ? exams.map(exam => (
-              <details key={exam._id} className="bg-gray-800 rounded-lg border border-gray-700">
-                  <summary className="p-4 flex justify-between items-center cursor-pointer list-none">
+              <details key={exam._id} className="bg-gray-800 rounded-lg border border-gray-700" onToggle={(e) => handleToggleDetails(exam._id, (e.target as HTMLDetailsElement).open)}>
+                  <summary className="p-4 flex justify-between items-center cursor-pointer list-none hover:bg-gray-700/50">
                       <div>
                           <h3 className="font-semibold">{exam.title}</h3>
                           <p className="text-sm text-gray-400">{exam.subject} ({exam.year})</p>
@@ -253,12 +285,18 @@ const AdminUploadExam: React.FC = () => {
                   </summary>
                   <div className="p-4 border-t border-gray-700">
                       <h4 className="font-semibold mb-2">Xem trước:</h4>
-                      <iframe 
-                          srcDoc={exam.htmlContent} 
-                          title={`Preview of ${exam.title}`}
-                          className="w-full h-96 rounded bg-white"
-                          sandbox=""
-                      />
+                      {loadingContentId === exam._id ? (
+                        <div className="w-full h-96 flex items-center justify-center bg-gray-700 rounded">
+                           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                        </div>
+                      ) : (
+                         <iframe 
+                            srcDoc={fullContentCache[exam._id] || "<p style='padding:1rem; color:#555;'>Mở rộng để tải nội dung xem trước.</p>"} 
+                            title={`Preview of ${exam.title}`}
+                            className="w-full h-96 rounded bg-white"
+                            sandbox=""
+                          />
+                      )}
                   </div>
               </details>
             )) : <p className="text-center text-gray-500 py-8">Chưa có đề thi nào.</p>}
