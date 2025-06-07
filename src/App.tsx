@@ -29,6 +29,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute'; // Component bả
 import AdminExamUpload from './components/AdminExamUpload'; // << Dòng mới
 import AllExamsPage from './pages/AllExamsPage'; // <<<< ADD THIS LINE
 import ExamPage from './pages/ExamPage'; 
+import AdminUploadExam from './components/AdminUploadExam' // Giả sử bạn có một component để upload exam
 // (Tùy chọn) Import các trang cần bảo vệ khác nếu có
 // import UserProfilePage from './pages/UserProfilePage';
 // import MySubscriptionsPage from './pages/MySubscriptionsPage';
@@ -76,6 +77,7 @@ const App = () => (
               {/* <Route path="/my-subscriptions" element={<MySubscriptionsPage />} /> */}
               <Route path="/my-account" element={<MyAccountPage />} />
               <Route path="/admin-exam-upload" element={<AdminExamUpload />} /> {/* << Route mới (bạn có thể đổi path cho rõ ràng hơn) */}
+              <Route path="/admin-upload-exam" element={<AdminUploadExam />} /> {/* << Route mới (bạn có thể đổi path cho rõ ràng hơn) */}
             </Route>
 
             {/* Not Found Route - Route cho các đường dẫn không khớp */}
