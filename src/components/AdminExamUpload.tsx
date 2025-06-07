@@ -60,10 +60,18 @@ const AdminExamUpload: React.FC = () => {
     setIsFetching(true);
     try {
       const response = await axiosInstance.get('/exams');
-      setExams(response.data);
+      // FIX: Ensure the response data is an array before setting the state to prevent .map() errors.
+      if (Array.isArray(response.data)) {
+        setExams(response.data);
+      } else {
+        console.error("API response for /exams is not an array:", response.data);
+        toast.error('Dữ liệu nhận được từ server không hợp lệ.');
+        setExams([]); // Default to an empty array to prevent crash
+      }
     } catch (error) {
       toast.error('Không thể tải danh sách đề thi.');
       console.error("Fetch exams error:", error);
+      setExams([]); // Also set to empty array on error
     } finally {
       setIsFetching(false);
     }
