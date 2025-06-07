@@ -38,7 +38,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL_VERCEL, // <<<< Biến môi trường cho URL Vercel của bạn
   process.env.FRONTEND_URL_LOCAL || 'http://localhost:5173', // Hoặc port local dev của bạn (ví dụ 3000, 8080)
   'https://essay-web-1.onrender.com',
-  'https://essay-web-neon.vercel.app/', // URL của chính backend trên Render (nếu cần)
+  'https://essay-web-neon.vercel.app', // URL của chính backend trên Render (nếu cần)
   // Thêm các URL preview của Vercel nếu bạn thường xuyên dùng và muốn test
 ].filter(Boolean); // Loại bỏ các giá trị undefined/null
 
