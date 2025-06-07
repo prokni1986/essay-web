@@ -5,7 +5,11 @@
       "destination": "/api/server.js"
     },
     {
-      "source": "/((?!api/|assets/).*)",
+      "source": "/(.*\\..*)",
+      "destination": "/$1"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]
