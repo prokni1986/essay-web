@@ -7,19 +7,46 @@ import UserSubscription from '../models/UserSubscription.js';
 import authenticateToken from '../config/authMiddleware.js'; // Bảo vệ các route cần đăng nhập
 import authenticateTokenOptional from '../config/authMiddlewareOptional.js'; // Cho phép khách xem preview
 
-// 1. LẤY DANH SÁCH TẤT CẢ ĐỀ THI
+// ===================================================================================
+// 1. LẤY DANH SÁCH TẤT CẢ ĐỀ THI (CÓ PHÂN TRANG) <<<< ĐÃ SỬA
+// ===================================================================================
 router.get('/', async (req, res) => {
     try {
+        // Lấy các tham số phân trang từ query string, với giá trị mặc định
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+
+        // Lấy tổng số đề thi để tính toán số trang
+        const totalExams = await Exam.countDocuments({});
+        const totalPages = Math.ceil(totalExams / limit);
+
+        // Lấy dữ liệu đề thi theo phân trang
         // Tối ưu: Không gửi htmlContent nặng nề khi chỉ lấy danh sách
-        const exams = await Exam.find({}).select('-htmlContent').sort({ year: -1, createdAt: -1 });
-        res.json(exams);
+        const exams = await Exam.find({})
+            .select('-htmlContent')
+            .sort({ year: -1, createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+        
+        // Trả về dữ liệu cùng với thông tin phân trang
+        res.json({
+            data: exams,
+            currentPage: page,
+            totalPages: totalPages,
+            totalExams: totalExams,
+        });
+
     } catch (err) {
         console.error("Error fetching exams:", err);
         res.status(500).json({ message: "Lỗi máy chủ khi lấy danh sách đề thi." });
     }
 });
 
-// 2. LẤY CHI TIẾT MỘT ĐỀ THI (VỚI LOGIC KIỂM TRA QUYỀN)
+
+// ===================================================================================
+// 2. LẤY CHI TIẾT MỘT ĐỀ THI (VỚI LOGIC KIỂM TRA QUYỀN) - Giữ nguyên logic gốc
+// ===================================================================================
 router.get('/:id', authenticateTokenOptional, async (req, res) => {
     try {
         const exam = await Exam.findById(req.params.id).populate('topic');
@@ -76,18 +103,19 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
     }
 });
 
-// 3. TẠO MỘT ĐỀ THI MỚI TỪ NỘI DUNG HTML <<<< ROUTE MỚI ĐỂ SỬA LỖI 404
+
+// ===================================================================================
+// 3. TẠO MỘT ĐỀ THI MỚI - Giữ nguyên logic gốc
+// ===================================================================================
 router.post('/create-html-post', authenticateToken, async (req, res) => {
-    // BẢO MẬT: Thêm logic kiểm tra quyền Admin ở đây
-    // Ví dụ:
-    // if (!req.user || req.user.email !== process.env.ADMIN_EMAIL) {
-    //     return res.status(403).json({ message: "Truy cập bị từ chối. Yêu cầu quyền Admin." });
-    // }
+    // BẢO MẬT: Giả định middleware `authenticateToken` đã thêm `req.user` và `req.user.role`
+    if (req.user.role !== 'admin') {
+         return res.status(403).json({ message: "Truy cập bị từ chối. Yêu cầu quyền Admin." });
+    }
 
     try {
         const { title, description, htmlContent, subject, year, province } = req.body;
         
-        // Kiểm tra các trường bắt buộc
         if (!title || !htmlContent || !subject || !year) {
             return res.status(400).json({ message: "Thiếu các thông tin bắt buộc (title, htmlContent, subject, year)." });
         }
@@ -113,9 +141,14 @@ router.post('/create-html-post', authenticateToken, async (req, res) => {
 });
 
 
-// 4. CẬP NHẬT MỘT ĐỀ THI
+// ===================================================================================
+// 4. CẬP NHẬT MỘT ĐỀ THI - Giữ nguyên logic gốc
+// ===================================================================================
 router.put('/:id', authenticateToken, async (req, res) => {
-    // Thêm logic kiểm tra quyền Admin ở đây
+    if (req.user.role !== 'admin') {
+         return res.status(403).json({ message: "Truy cập bị từ chối. Yêu cầu quyền Admin." });
+    }
+
     try {
         const updatedExam = await Exam.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
         if (!updatedExam) {
@@ -131,15 +164,33 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// 5. XÓA MỘT ĐỀ THI
+
+// ===================================================================================
+// 5. XÓA MỘT ĐỀ THI <<<< ĐÃ SỬA
+// ===================================================================================
 router.delete('/:id', authenticateToken, async (req, res) => {
-    // Thêm logic kiểm tra quyền Admin ở đây
+    // 1. BẢO MẬT: Kiểm tra quyền Admin (giả định `req.user.role` được cung cấp bởi middleware)
+    if (!req.user || req.user.role !== 'admin') {
+        return res.status(403).json({ message: "Truy cập bị từ chối. Yêu cầu quyền Admin." });
+    }
+
     try {
-        const deletedExam = await Exam.findByIdAndDelete(req.params.id);
-        if (!deletedExam) {
+        const examId = req.params.id;
+
+        // Tìm đề thi để đảm bảo nó tồn tại trước khi xóa
+        const examToDelete = await Exam.findById(examId);
+        if (!examToDelete) {
             return res.status(404).json({ message: 'Không tìm thấy đề thi để xóa.' });
         }
-        res.json({ message: `Đã xóa thành công đề thi: "${deletedExam.title}"` });
+
+        // 2. DỌN DẸP DỮ LIỆU: Xóa tất cả các gói đăng ký liên quan đến đề thi này
+        await UserSubscription.deleteMany({ subscribedItem: examId, onModel: 'Exam' });
+
+        // 3. XÓA ĐỀ THI: Sau khi dọn dẹp xong mới xóa đề thi
+        await Exam.findByIdAndDelete(examId);
+
+        res.json({ message: `Đã xóa thành công đề thi: "${examToDelete.title}" và các gói đăng ký liên quan.` });
+
     } catch (err) {
         console.error("Error deleting exam:", err);
         res.status(500).json({ message: "Lỗi máy chủ khi xóa đề thi." });
