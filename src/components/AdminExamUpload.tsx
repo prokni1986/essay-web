@@ -8,13 +8,28 @@ import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Pencil, Trash2 } from 'lucide-react';
 
-// Define the axios instance. To align with AllExamsPage.tsx and ensure consistency,
-// we will call the full API path in each request instead of setting a baseURL here.
-const axiosInstance = axios.create({
-  headers: {
-    'Content-Type': 'application/json',
+// Define the axios instance.
+const axiosInstance = axios.create();
+
+// =================================================================================
+// AUTHENTICATION INTERCEPTOR
+// This interceptor will automatically add the Authorization header to every request
+// if a token is found in localStorage. This is crucial for accessing protected API routes.
+// Your login logic should save the token to localStorage like this:
+// localStorage.setItem('authToken', 'your-jwt-token');
+// =================================================================================
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
   },
-});
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // Định nghĩa kiểu cho một đề thi
 interface Exam {
@@ -59,21 +74,19 @@ const AdminExamUpload: React.FC = () => {
     setIsFetching(true);
     setApiError(null);
     try {
-      // MODIFICATION: Call the full API path, identical to AllExamsPage.tsx.
       const response = await axiosInstance.get('/api/exams');
       
       const contentType = response.headers['content-type'];
       if (contentType && contentType.includes('text/html')) {
-        const errorMessage = 'Lỗi Cấu Hình Server: API trả về một trang HTML thay vì dữ liệu JSON. Điều này thường xảy ra khi routing của server không được cấu hình đúng để xử lý các yêu cầu API (ví dụ: /api/*). Vui lòng kiểm tra file cấu hình của server (ví dụ: vercel.json).';
+        const errorMessage = 'Lỗi Cấu Hình Server: API trả về một trang HTML thay vì dữ liệu JSON. Điều này thường xảy ra khi routing của server không được cấu hình đúng hoặc yêu cầu thiếu xác thực. Vui lòng kiểm tra lại file cấu hình server (ví dụ: vercel.json) và đảm bảo bạn đã đăng nhập với quyền admin.';
         console.error("API Error: Server responded with an HTML page instead of JSON for the /api/exams endpoint.");
-        toast.error('Lỗi cấu hình server.');
+        toast.error('Lỗi cấu hình server hoặc xác thực.');
         setApiError(errorMessage);
         setExams([]);
         return; 
       }
 
       if (Array.isArray(response.data)) {
-        // Sort exams by creation date, newest first
         const sortedExams = response.data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setExams(sortedExams);
       } else {
@@ -84,7 +97,10 @@ const AdminExamUpload: React.FC = () => {
         setExams([]);
       }
     } catch (error) {
-      const errorMessage = 'Không thể tải danh sách đề thi. Vui lòng kiểm tra kết nối và cấu hình API.';
+      let errorMessage = 'Không thể tải danh sách đề thi. Vui lòng kiểm tra kết nối, cấu hình API và quyền truy cập.';
+      if (axios.isAxiosError(error) && error.response?.status === 401) {
+          errorMessage = 'Lỗi xác thực: Bạn không có quyền truy cập. Vui lòng đăng nhập lại.';
+      }
       toast.error(errorMessage);
       setApiError(errorMessage);
       console.error("Fetch exams error:", error);
