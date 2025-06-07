@@ -8,7 +8,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-// Cập nhật Interface để khớp với response từ backend
+// Interface cho dữ liệu trả về từ API
 interface ExamData {
   _id: string;
   title: string;
@@ -28,7 +28,9 @@ interface ApiErrorResponse {
   message?: string;
 }
 
+// <<<< THÊM MỚI >>>>
 // Khai báo MathJax trên đối tượng window để TypeScript không báo lỗi
+// và để chúng ta có thể gọi các hàm của nó một cách an toàn.
 declare global {
   interface Window {
     MathJax: {
@@ -62,7 +64,7 @@ const ExamPage: React.FC = () => {
       try {
         const response = await axiosInstance.get<ExamData>(`/api/exams/${id}`);
         setExam(response.data);
-      } catch (err: unknown) { // Sửa lỗi: Dùng 'unknown' thay vì 'any'
+      } catch (err) {
         console.error("Lỗi khi tải đề thi:", err);
         if (axios.isAxiosError<ApiErrorResponse>(err)) {
           setError(err.response?.data?.message || "Không thể tải nội dung đề thi.");
@@ -77,13 +79,20 @@ const ExamPage: React.FC = () => {
     fetchExam();
   }, [id]);
 
+  // <<<< THÊM MỚI: useEffect để trigger MathJax re-render >>>>
   useEffect(() => {
+    // Chỉ chạy sau khi dữ liệu exam đã được load và có quyền xem nội dung
     if (exam && exam.canViewFullContent) {
-      if (window.MathJax) {
+      // Kiểm tra xem đối tượng MathJax có tồn tại trên window không
+      if (typeof window.MathJax !== "undefined") {
+        // Đưa lệnh "Typeset" vào hàng đợi của MathJax.
+        // Lệnh này yêu cầu MathJax quét lại toàn bộ trang và định dạng
+        // bất kỳ mã toán học nào nó tìm thấy.
         window.MathJax.Hub.Queue(["Typeset", window.MathJax.Hub]);
       }
     }
-  }, [exam]);
+  }, [exam]); // Effect này sẽ chạy lại mỗi khi state `exam` thay đổi.
+
 
   const handleSubscribe = async (type: 'exam' | 'full', examId: string) => {
     if (!isAuthenticated) {
@@ -99,9 +108,10 @@ const ExamPage: React.FC = () => {
     try {
         const response = await axiosInstance.post(endpoint);
         toast.success(response.data.message || successMessage);
+        // Tải lại dữ liệu sau khi subscribe thành công
         const updatedExam = await axiosInstance.get<ExamData>(`/api/exams/${id}`);
         setExam(updatedExam.data);
-    } catch (error: unknown) { // Sửa lỗi: Dùng 'unknown' thay vì 'any'
+    } catch (error) {
         if (axios.isAxiosError<ApiErrorResponse>(error)) {
             toast.error(error.response?.data?.message || errorMessageBase);
         } else {
