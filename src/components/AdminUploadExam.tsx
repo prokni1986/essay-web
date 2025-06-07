@@ -6,20 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
-import { Pencil, Trash2, XCircle } from 'lucide-react';
+import { Pencil, Trash2, XCircle, Eye } from 'lucide-react';
 
 // =================================================================================
 // CẤU HÌNH AXIOS VÀ INTERCEPTOR XÁC THỰC
 // =================================================================================
-// FIX: Định nghĩa axiosInstance trực tiếp trong file để loại bỏ lỗi import.
-// Điều này giúp component hoạt động độc lập mà không cần file cấu hình bên ngoài.
 const axiosInstance = axios.create();
 
-// Interceptor sẽ tự động đính kèm token xác thực (nếu có) vào mỗi yêu cầu.
-// Logic đăng nhập của bạn cần lưu token vào localStorage với key là 'authToken'.
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Chỉ thêm token cho các yêu cầu API, không phải các yêu cầu file tĩnh.
     if (config.url && config.url.startsWith('/api')) {
         const token = localStorage.getItem('authToken');
         if (token) {
@@ -68,14 +63,12 @@ const AdminUploadExam: React.FC = () => {
   const [htmlContent, setHtmlContent] = useState('');
   
   // State cho các trạng thái giao diện
-  const [isLoading, setIsLoading] = useState(false); // Loading khi submit form
-  const [isFetching, setIsFetching] = useState(true); // Loading khi tải danh sách
-  const [apiError, setApiError] = useState<string | null>(null); // State cho lỗi API
-  const [deleteConfirm, setDeleteConfirm] = useState<Exam | null>(null); // State cho modal xác nhận xóa
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Exam | null>(null);
 
   // === API FUNCTIONS ===
-
-  // Hàm lấy danh sách đề thi từ API
   const fetchExams = useCallback(async () => {
     setIsFetching(true);
     setApiError(null);
@@ -83,16 +76,10 @@ const AdminUploadExam: React.FC = () => {
       const response = await axiosInstance.get('/api/exams');
       
       let examsData = response.data;
-
-      // Xử lý trường hợp dữ liệu là một object chứa một mảng bên trong
       if (!Array.isArray(examsData) && typeof examsData === 'object' && examsData !== null) {
-        if (Array.isArray(examsData.data)) {
-            examsData = examsData.data;
-        } else if (Array.isArray(examsData.exams)) {
-            examsData = examsData.exams;
-        } else if (Array.isArray(examsData.results)) {
-            examsData = examsData.results;
-        }
+        if (Array.isArray(examsData.data)) examsData = examsData.data;
+        else if (Array.isArray(examsData.exams)) examsData = examsData.exams;
+        else if (Array.isArray(examsData.results)) examsData = examsData.results;
       }
       
       if (Array.isArray(examsData)) {
@@ -137,14 +124,20 @@ const AdminUploadExam: React.FC = () => {
   };
 
   const handleEditClick = (exam: Exam) => {
-    setEditingExam(exam);
-    setTitle(exam.title);
-    setDescription(exam.description || '');
-    setSubject(exam.subject);
-    setYear(exam.year);
-    setProvince(exam.province || '');
-    setHtmlContent(exam.htmlContent);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Nếu đang sửa bài này rồi thì đóng lại, ngược lại thì mở ra
+    if (editingExam?._id === exam._id) {
+        resetForm();
+    } else {
+        setEditingExam(exam);
+        setTitle(exam.title);
+        setDescription(exam.description || '');
+        setSubject(exam.subject);
+        setYear(exam.year);
+        setProvince(exam.province || '');
+        setHtmlContent(exam.htmlContent);
+        // Tìm element form và cuộn tới
+        document.getElementById('exam-form-section')?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -168,8 +161,7 @@ const AdminUploadExam: React.FC = () => {
       resetForm();
       fetchExams();
     } catch (error) {
-      const errorMessage = 'Thao tác thất bại.';
-      toast.error(errorMessage);
+      toast.error('Thao tác thất bại.');
       console.error("Submit error:", error);
     } finally {
       setIsLoading(false);
@@ -196,7 +188,7 @@ const AdminUploadExam: React.FC = () => {
   // === RENDER FUNCTION ===
   return (
     <div className="p-4 md:p-8 text-white bg-gray-900 rounded-lg space-y-12">
-      <section>
+      <section id="exam-form-section">
         <h1 className="text-3xl font-bold mb-4">{editingExam ? 'Chỉnh Sửa Đề Thi' : 'Tạo Đề Thi Mới'}</h1>
         <p className="text-sm text-gray-400 mb-6">
           {editingExam ? `Bạn đang chỉnh sửa đề: "${editingExam.title}"` : 'Điền thông tin và dán toàn bộ code HTML của đề thi vào ô bên dưới.'}
@@ -252,24 +244,34 @@ const AdminUploadExam: React.FC = () => {
             <p className="mt-2 text-sm text-red-200">{apiError}</p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {exams.length > 0 ? exams.map(exam => (
-              <div key={exam._id} className="bg-gray-800 p-4 rounded-lg flex items-center justify-between transition-colors hover:bg-gray-700/50">
-                <div>
-                  <h3 className="font-semibold text-lg text-gray-100">{exam.title}</h3>
-                  <p className="text-sm text-gray-400">{exam.subject} - {exam.province || 'N/A'} ({exam.year})</p>
-                  <p className="text-xs text-gray-500 mt-1">Đăng ngày: {new Date(exam.createdAt).toLocaleDateString('vi-VN')}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={() => handleEditClick(exam)} className="hover:bg-gray-600" aria-label="Sửa">
-                    <Pencil className="h-4 w-4 text-blue-400" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => setDeleteConfirm(exam)} className="hover:bg-gray-600" aria-label="Xóa">
-                    <Trash2 className="h-4 w-4 text-red-500" />
-                  </Button>
-                </div>
-              </div>
-            )) : <p className="text-center text-gray-500">Chưa có đề thi nào được tạo.</p>}
+              <details key={exam._id} className="bg-gray-800 rounded-lg overflow-hidden border border-gray-700 transition-all duration-300">
+                  <summary className="p-4 flex justify-between items-center cursor-pointer list-none hover:bg-gray-700/50">
+                      <div>
+                          <h3 className="font-semibold text-lg text-gray-100">{exam.title}</h3>
+                          <p className="text-sm text-gray-400">{exam.subject} - {exam.province || 'N/A'} ({exam.year})</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEditClick(exam); }} className="hover:bg-gray-600" aria-label="Sửa">
+                              <Pencil className="h-4 w-4 text-blue-400" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(exam); }} className="hover:bg-gray-600" aria-label="Xóa">
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                      </div>
+                  </summary>
+                  <div className="p-4 border-t border-gray-700">
+                      <h4 className="font-semibold mb-2">Xem trước nội dung:</h4>
+                      <iframe 
+                          srcDoc={exam.htmlContent} 
+                          title={`Preview of ${exam.title}`}
+                          className="w-full h-96 rounded bg-white border border-gray-600"
+                          sandbox="" // Hạn chế các quyền của iframe để tăng bảo mật
+                      />
+                  </div>
+              </details>
+            )) : <p className="text-center text-gray-500 py-8">Chưa có đề thi nào được tạo.</p>}
           </div>
         )}
       </section>
