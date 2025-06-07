@@ -60,12 +60,22 @@ const AdminExamUpload: React.FC = () => {
     setIsFetching(true);
     try {
       const response = await axiosInstance.get('/exams');
+
+      // FIX: Check if the response is an HTML page, which often indicates a server routing issue.
+      const contentType = response.headers['content-type'];
+      if (contentType && contentType.includes('text/html')) {
+        console.error("API Error: Server responded with an HTML page instead of JSON for the /exams endpoint.");
+        toast.error('Lỗi: API trả về HTML thay vì dữ liệu JSON. Vui lòng kiểm tra cấu hình server hoặc đường dẫn API.');
+        setExams([]); // Prevent crash
+        return; 
+      }
+
       // FIX: Ensure the response data is an array before setting the state to prevent .map() errors.
       if (Array.isArray(response.data)) {
         setExams(response.data);
       } else {
         console.error("API response for /exams is not an array:", response.data);
-        toast.error('Dữ liệu nhận được từ server không hợp lệ.');
+        toast.error('Dữ liệu nhận được từ server không hợp lệ (không phải dạng mảng).');
         setExams([]); // Default to an empty array to prevent crash
       }
     } catch (error) {
