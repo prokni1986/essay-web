@@ -12,6 +12,7 @@ import { Pencil, Trash2, XCircle } from 'lucide-react';
 // CẤU HÌNH AXIOS VÀ INTERCEPTOR XÁC THỰC
 // =================================================================================
 // Khởi tạo một axios instance để sử dụng trong component này.
+// FIX: Định nghĩa axiosInstance trực tiếp thay vì import để giải quyết lỗi đường dẫn.
 const axiosInstance = axios.create();
 
 // Interceptor sẽ tự động đính kèm token xác thực (nếu có) vào mỗi yêu cầu.
@@ -77,9 +78,9 @@ const AdminUploadExam: React.FC = () => {
     setIsFetching(true);
     setApiError(null);
     try {
+      // Sử dụng axiosInstance đã định nghĩa ở trên để tự động có header xác thực
       const response = await axiosInstance.get('/api/exams');
       
-      // Kiểm tra kỹ lưỡng dữ liệu trả về
       if (Array.isArray(response.data)) {
         const sortedExams = response.data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setExams(sortedExams);
