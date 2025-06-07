@@ -50,49 +50,53 @@ const AdminExamUpload: React.FC = () => {
   const [province, setProvince] = useState('');
   const [htmlContent, setHtmlContent] = useState('');
 
-  // State cho trạng thái loading và xác nhận xóa
+  // State cho trạng thái loading, fetching và lỗi API
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Exam | null>(null);
 
   // Hàm lấy danh sách đề thi từ API
   const fetchExams = async () => {
     setIsFetching(true);
+    setApiError(null); // Reset lỗi trước mỗi lần fetch
     try {
       const response = await axiosInstance.get('/exams');
-
-      // FIX: Check if the response is an HTML page, which often indicates a server routing issue.
+      
       const contentType = response.headers['content-type'];
       if (contentType && contentType.includes('text/html')) {
+        const errorMessage = 'Lỗi Cấu Hình Server: API trả về một trang HTML thay vì dữ liệu JSON. Điều này thường xảy ra khi routing của server không được cấu hình đúng để xử lý các yêu cầu API (ví dụ: /api/*). Vui lòng kiểm tra file cấu hình của server (ví dụ: vercel.json).';
         console.error("API Error: Server responded with an HTML page instead of JSON for the /exams endpoint.");
-        toast.error('Lỗi: API trả về HTML thay vì dữ liệu JSON. Vui lòng kiểm tra cấu hình server hoặc đường dẫn API.');
-        setExams([]); // Prevent crash
+        toast.error('Lỗi cấu hình server.');
+        setApiError(errorMessage);
+        setExams([]);
         return; 
       }
 
-      // FIX: Ensure the response data is an array before setting the state to prevent .map() errors.
       if (Array.isArray(response.data)) {
         setExams(response.data);
       } else {
+        const errorMessage = 'Dữ liệu nhận được từ server không hợp lệ (không phải là một mảng).';
         console.error("API response for /exams is not an array:", response.data);
-        toast.error('Dữ liệu nhận được từ server không hợp lệ (không phải dạng mảng).');
-        setExams([]); // Default to an empty array to prevent crash
+        toast.error(errorMessage);
+        setApiError(errorMessage);
+        setExams([]);
       }
     } catch (error) {
-      toast.error('Không thể tải danh sách đề thi.');
+      const errorMessage = 'Không thể tải danh sách đề thi. Vui lòng kiểm tra kết nối và cấu hình API.';
+      toast.error(errorMessage);
+      setApiError(errorMessage);
       console.error("Fetch exams error:", error);
-      setExams([]); // Also set to empty array on error
+      setExams([]);
     } finally {
       setIsFetching(false);
     }
   };
 
-  // Lấy danh sách đề thi khi component được render lần đầu
   useEffect(() => {
     fetchExams();
   }, []);
 
-  // Hàm reset form
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -103,7 +107,6 @@ const AdminExamUpload: React.FC = () => {
     setEditingExam(null);
   };
 
-  // Hàm xử lý khi nhấn nút Sửa
   const handleEditClick = (exam: Exam) => {
     setEditingExam(exam);
     setTitle(exam.title);
@@ -112,11 +115,9 @@ const AdminExamUpload: React.FC = () => {
     setYear(exam.year);
     setProvince(exam.province || '');
     setHtmlContent(exam.htmlContent);
-    // Cuộn lên đầu trang để người dùng thấy form
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Hàm xử lý submit form (tạo mới hoặc cập nhật)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !htmlContent || !subject || !year) {
@@ -136,16 +137,14 @@ const AdminExamUpload: React.FC = () => {
 
     try {
       if (editingExam) {
-        // Cập nhật đề thi đã có
         await axiosInstance.put(`/exams/${editingExam._id}`, examData);
         toast.success('Cập nhật đề thi thành công!');
       } else {
-        // Tạo đề thi mới
         await axiosInstance.post('/exams/create-html-post', examData);
         toast.success('Lưu đề thi thành công!');
       }
       resetForm();
-      fetchExams(); // Tải lại danh sách đề thi
+      fetchExams();
     } catch (error) {
       let errorMessage = 'Có lỗi không xác định xảy ra.';
       if (axios.isAxiosError(error)) {
@@ -161,7 +160,6 @@ const AdminExamUpload: React.FC = () => {
     }
   };
 
-  // Hàm xử lý khi xác nhận xóa
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
     setIsLoading(true);
@@ -231,13 +229,18 @@ const AdminExamUpload: React.FC = () => {
         <h2 className="text-3xl font-bold mb-6 border-t border-gray-700 pt-8">Quản Lý Đề Thi</h2>
         {isFetching ? (
           <p>Đang tải danh sách đề thi...</p>
+        ) : apiError ? (
+          <div className="bg-red-900/50 border border-red-500 text-white p-4 rounded-lg">
+            <h4 className="font-bold text-red-400">Không thể hiển thị danh sách đề thi</h4>
+            <p className="mt-2 text-sm text-red-200">{apiError}</p>
+          </div>
         ) : (
           <div className="space-y-4">
             {exams.length > 0 ? exams.map(exam => (
               <div key={exam._id} className="bg-gray-800 p-4 rounded-lg flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-lg">{exam.title}</h3>
-                  <p className="text-sm text-gray-400">{exam.subject} - {exam.province} ({exam.year})</p>
+                  <p className="text-sm text-gray-400">{exam.subject} - {exam.province || 'N/A'} ({exam.year})</p>
                   <p className="text-xs text-gray-500 mt-1">Đăng ngày: {new Date(exam.createdAt).toLocaleDateString('vi-VN')}</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -256,7 +259,7 @@ const AdminExamUpload: React.FC = () => {
 
       {/* --- Modal Xác Nhận Xóa --- */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
           <div className="bg-gray-800 rounded-lg p-6 shadow-xl max-w-sm w-full">
             <h3 className="text-lg font-bold">Xác nhận xóa</h3>
             <p className="my-4 text-gray-300">Bạn có chắc chắn muốn xóa đề thi này không?</p>
