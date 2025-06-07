@@ -8,14 +8,14 @@ import authenticateToken from '../config/authMiddleware.js';
 import authenticateTokenOptional from '../config/authMiddlewareOptional.js';
 
 // ===================================================================================
-// 1. LẤY DANH SÁCH TẤT CẢ ĐỀ THI <<<< ĐÃ SỬA
+// 1. LẤY DANH SÁCH TẤT CẢ ĐỀ THI - DÀNH CHO ADMIN VÀ TRANG CÔNG KHAI
 // ===================================================================================
 router.get('/', async (req, res) => {
     try {
-        // SỬA ĐỔI: Bỏ phân trang, trả về toàn bộ danh sách tóm tắt.
-        // Component AdminUploadExam sẽ tải toàn bộ danh sách một lần.
+        // Route này không cần xác thực, chỉ trả về danh sách tóm tắt.
+        // Trang admin sẽ gọi route GET /:id để lấy nội dung đầy đủ khi cần.
         const exams = await Exam.find({})
-            .select('-htmlContent') // Vẫn tối ưu bằng cách không gửi nội dung HTML
+            .select('-htmlContent') // Tối ưu: không gửi nội dung HTML nặng nề
             .sort({ year: -1, createdAt: -1 });
             
         res.json(exams); // Trả về trực tiếp mảng dữ liệu
@@ -28,22 +28,20 @@ router.get('/', async (req, res) => {
 
 
 // ===================================================================================
-// 2. LẤY CHI TIẾT MỘT ĐỀ THI - Giữ nguyên logic gốc
+// 2. LẤY CHI TIẾT MỘT ĐỀ THI
 // ===================================================================================
 router.get('/:id', authenticateTokenOptional, async (req, res) => {
     try {
-        // Lấy toàn bộ nội dung khi được hỏi, bao gồm cả htmlContent
         const exam = await Exam.findById(req.params.id).populate('topic');
         if (!exam) {
             return res.status(404).json({ message: "Không tìm thấy đề thi." });
         }
 
-        // Logic kiểm tra quyền truy cập vẫn giữ nguyên
         let canViewFullContent = false;
         let subscriptionStatus = 'none';
-
-        if (req.user && req.user.role === 'admin') {
-             // Admin luôn có quyền xem toàn bộ nội dung
+        
+        // SỬA ĐỔI: Kiểm tra quyền Admin bằng email từ biến môi trường
+        if (req.user && req.user.email === process.env.ADMIN_EMAIL) {
              canViewFullContent = true;
              subscriptionStatus = 'admin_access';
         } else if (req.user) {
@@ -62,9 +60,10 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
         }
 
         if (canViewFullContent) {
-            res.json(exam); // Trả về toàn bộ object
+            // Admin hoặc người dùng đã đăng ký sẽ nhận được toàn bộ nội dung
+            res.json(exam);
         } else {
-            // Đối với người dùng chưa đăng ký, trả về thông tin giới hạn
+            // Người dùng khác nhận được thông tin giới hạn
             res.json({
                 _id: exam._id,
                 title: exam.title,
@@ -86,10 +85,11 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
 
 
 // ===================================================================================
-// 3. TẠO MỘT ĐỀ THI MỚI - Logic kiểm tra quyền Admin giờ sẽ hoạt động
+// 3. TẠO MỘT ĐỀ THI MỚI
 // ===================================================================================
 router.post('/create-html-post', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') {
+    // SỬA ĐỔI: Kiểm tra quyền Admin bằng email
+    if (!req.user || req.user.email !== process.env.ADMIN_EMAIL) {
          return res.status(403).json({ message: "Truy cập bị từ chối. Yêu cầu quyền Admin." });
     }
 
@@ -112,7 +112,8 @@ router.post('/create-html-post', authenticateToken, async (req, res) => {
 // 4. CẬP NHẬT MỘT ĐỀ THI
 // ===================================================================================
 router.put('/:id', authenticateToken, async (req, res) => {
-    if (req.user.role !== 'admin') {
+    // SỬA ĐỔI: Kiểm tra quyền Admin bằng email
+    if (!req.user || req.user.email !== process.env.ADMIN_EMAIL) {
          return res.status(403).json({ message: "Truy cập bị từ chối. Yêu cầu quyền Admin." });
     }
 
@@ -133,7 +134,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
 // 5. XÓA MỘT ĐỀ THI
 // ===================================================================================
 router.delete('/:id', authenticateToken, async (req, res) => {
-    if (!req.user || req.user.role !== 'admin') {
+    // SỬA ĐỔI: Kiểm tra quyền Admin bằng email
+    if (!req.user || req.user.email !== process.env.ADMIN_EMAIL) {
         return res.status(403).json({ message: "Truy cập bị từ chối. Yêu cầu quyền Admin." });
     }
 
@@ -143,7 +145,9 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         if (!examToDelete) {
             return res.status(404).json({ message: 'Không tìm thấy đề thi để xóa.' });
         }
+        // Xóa các gói đăng ký liên quan
         await UserSubscription.deleteMany({ subscribedItem: examId, onModel: 'Exam' });
+        // Xóa đề thi
         await Exam.findByIdAndDelete(examId);
         res.json({ message: `Đã xóa thành công đề thi: "${examToDelete.title}"` });
     } catch (err) {
