@@ -28,9 +28,7 @@ interface ApiErrorResponse {
   message?: string;
 }
 
-// <<<< THÊM MỚI >>>>
 // Khai báo MathJax trên đối tượng window để TypeScript không báo lỗi
-// và để chúng ta có thể gọi các hàm của nó một cách an toàn.
 declare global {
   interface Window {
     MathJax: {
@@ -64,7 +62,7 @@ const ExamPage: React.FC = () => {
       try {
         const response = await axiosInstance.get<ExamData>(`/api/exams/${id}`);
         setExam(response.data);
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Lỗi khi tải đề thi:", err);
         if (axios.isAxiosError<ApiErrorResponse>(err)) {
           setError(err.response?.data?.message || "Không thể tải nội dung đề thi.");
@@ -79,19 +77,21 @@ const ExamPage: React.FC = () => {
     fetchExam();
   }, [id]);
 
-  // <<<< THÊM MỚI: useEffect để trigger MathJax re-render >>>>
+  // SỬA ĐỔI QUAN TRỌNG: Thêm setTimeout để đảm bảo DOM được cập nhật trước khi chạy MathJax
   useEffect(() => {
-    // Chỉ chạy sau khi dữ liệu exam đã được load và có quyền xem nội dung
     if (exam && exam.canViewFullContent) {
-      // Kiểm tra xem đối tượng MathJax có tồn tại trên window không
       if (typeof window.MathJax !== "undefined") {
-        // Đưa lệnh "Typeset" vào hàng đợi của MathJax.
-        // Lệnh này yêu cầu MathJax quét lại toàn bộ trang và định dạng
-        // bất kỳ mã toán học nào nó tìm thấy.
-        window.MathJax.Hub.Queue(["Typeset", window.MathJax.Hub]);
+        // Sử dụng setTimeout để đẩy lệnh này xuống cuối hàng đợi thực thi,
+        // sau khi trình duyệt đã render xong DOM mới.
+        const timeoutId = setTimeout(() => {
+          window.MathJax.Hub.Queue(["Typeset", window.MathJax.Hub]);
+        }, 100); // Một độ trễ nhỏ 100ms là đủ an toàn
+
+        // Dọn dẹp timeout nếu component bị unmount
+        return () => clearTimeout(timeoutId);
       }
     }
-  }, [exam]); // Effect này sẽ chạy lại mỗi khi state `exam` thay đổi.
+  }, [exam]); // Effect này vẫn chạy lại mỗi khi state `exam` thay đổi.
 
 
   const handleSubscribe = async (type: 'exam' | 'full', examId: string) => {
@@ -108,10 +108,9 @@ const ExamPage: React.FC = () => {
     try {
         const response = await axiosInstance.post(endpoint);
         toast.success(response.data.message || successMessage);
-        // Tải lại dữ liệu sau khi subscribe thành công
         const updatedExam = await axiosInstance.get<ExamData>(`/api/exams/${id}`);
         setExam(updatedExam.data);
-    } catch (error) {
+    } catch (error: unknown) {
         if (axios.isAxiosError<ApiErrorResponse>(error)) {
             toast.error(error.response?.data?.message || errorMessageBase);
         } else {
