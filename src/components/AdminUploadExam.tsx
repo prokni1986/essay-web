@@ -13,8 +13,8 @@ import { Pencil, Trash2, XCircle } from 'lucide-react';
 // =================================================================================
 // FIX: Định nghĩa axiosInstance trực tiếp trong file để loại bỏ lỗi import đường dẫn alias.
 const axiosInstance = axios.create({
-  // Sử dụng URL backend trên Render.com mà bạn đã cung cấp.
-  baseURL: 'https://essay-web-1.onrender.com', 
+  // Sửa đổi: Sử dụng URL backend từ biến môi trường của Vite.
+  baseURL: import.meta.env.VITE_API_BASE_URL,
 });
 
 // Interceptor sẽ tự động đính kèm token xác thực (nếu có) vào mỗi yêu cầu.
