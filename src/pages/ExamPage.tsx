@@ -8,7 +8,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
-// Interface cho dữ liệu trả về từ API
 interface ExamData {
   _id: string;
   title: string;
@@ -23,12 +22,10 @@ interface ExamData {
   message?: string;
 }
 
-// Interface cho lỗi API
 interface ApiErrorResponse {
   message?: string;
 }
 
-// Khai báo MathJax trên đối tượng window để TypeScript không báo lỗi
 declare global {
   interface Window {
     MathJax: {
@@ -77,22 +74,21 @@ const ExamPage: React.FC = () => {
     fetchExam();
   }, [id]);
 
-  // SỬA ĐỔI QUAN TRỌNG: Thêm setTimeout để đảm bảo DOM được cập nhật trước khi chạy MathJax
   useEffect(() => {
-    if (exam && exam.canViewFullContent) {
-      if (typeof window.MathJax !== "undefined") {
-        // Sử dụng setTimeout để đẩy lệnh này xuống cuối hàng đợi thực thi,
-        // sau khi trình duyệt đã render xong DOM mới.
-        const timeoutId = setTimeout(() => {
-          window.MathJax.Hub.Queue(["Typeset", window.MathJax.Hub]);
-        }, 100); // Một độ trễ nhỏ 100ms là đủ an toàn
+    // Chạy logic này khi `exam` thay đổi (tức là sau khi dữ liệu được tải)
+    if (exam) {
+      // Chỉ gọi MathJax nếu có nội dung để hiển thị
+      if ((exam.canViewFullContent && exam.htmlContent) || exam.previewContent) {
+        if (typeof window.MathJax !== "undefined") {
+          const timeoutId = setTimeout(() => {
+            window.MathJax.Hub.Queue(["Typeset", window.MathJax.Hub]);
+          }, 150); // Độ trễ nhỏ để đảm bảo DOM render xong
 
-        // Dọn dẹp timeout nếu component bị unmount
-        return () => clearTimeout(timeoutId);
+          return () => clearTimeout(timeoutId);
+        }
       }
     }
-  }, [exam]); // Effect này vẫn chạy lại mỗi khi state `exam` thay đổi.
-
+  }, [exam]);
 
   const handleSubscribe = async (type: 'exam' | 'full', examId: string) => {
     if (!isAuthenticated) {
@@ -100,19 +96,16 @@ const ExamPage: React.FC = () => {
         navigate('/login', { state: { from: location } });
         return;
     }
-
     const endpoint = type === 'full' ? '/api/subscriptions/full-access' : `/api/subscriptions/exam/${examId}`;
-    const successMessage = type === 'full' ? "Đăng ký gói Full Access thành công!" : "Đăng ký đề thi thành công!";
-    const errorMessageBase = type === 'full' ? "Lỗi khi đăng ký gói Full Access." : "Lỗi khi đăng ký đề thi.";
-
     try {
         const response = await axiosInstance.post(endpoint);
-        toast.success(response.data.message || successMessage);
+        toast.success(response.data.message || "Đăng ký thành công!");
+        // Fetch lại dữ liệu để cập nhật UI
         const updatedExam = await axiosInstance.get<ExamData>(`/api/exams/${id}`);
         setExam(updatedExam.data);
     } catch (error: unknown) {
         if (axios.isAxiosError<ApiErrorResponse>(error)) {
-            toast.error(error.response?.data?.message || errorMessageBase);
+            toast.error(error.response?.data?.message || "Lỗi khi thực hiện đăng ký.");
         } else {
             toast.error("Đã xảy ra lỗi không xác định.");
         }
@@ -155,7 +148,6 @@ const ExamPage: React.FC = () => {
               <div className="text-gray-300 mb-6 leading-relaxed max-w-3xl mx-auto"
                    dangerouslySetInnerHTML={{ __html: exam.previewContent || exam.message || ""}}
               />
-
               {!isAuthenticated ? (
                 <div className="space-y-3 mt-6">
                     <p className="text-gray-300">Vui lòng đăng nhập để có thể đăng ký xem nội dung này.</p>
