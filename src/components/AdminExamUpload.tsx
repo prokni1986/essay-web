@@ -8,11 +8,9 @@ import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 import { Pencil, Trash2 } from 'lucide-react';
 
-// To resolve the module resolution error, we define the axios instance directly in this file.
-// In a larger application, this would typically be in a separate configuration file
-// like 'src/lib/axiosInstance.ts'.
+// Define the axios instance. To align with AllExamsPage.tsx and ensure consistency,
+// we will call the full API path in each request instead of setting a baseURL here.
 const axiosInstance = axios.create({
-  baseURL: '/api', // Adjust this if your API is on a different path
   headers: {
     'Content-Type': 'application/json',
   },
@@ -59,14 +57,15 @@ const AdminExamUpload: React.FC = () => {
   // Hàm lấy danh sách đề thi từ API
   const fetchExams = async () => {
     setIsFetching(true);
-    setApiError(null); // Reset lỗi trước mỗi lần fetch
+    setApiError(null);
     try {
-      const response = await axiosInstance.get('/exams');
+      // MODIFICATION: Call the full API path, identical to AllExamsPage.tsx.
+      const response = await axiosInstance.get('/api/exams');
       
       const contentType = response.headers['content-type'];
       if (contentType && contentType.includes('text/html')) {
         const errorMessage = 'Lỗi Cấu Hình Server: API trả về một trang HTML thay vì dữ liệu JSON. Điều này thường xảy ra khi routing của server không được cấu hình đúng để xử lý các yêu cầu API (ví dụ: /api/*). Vui lòng kiểm tra file cấu hình của server (ví dụ: vercel.json).';
-        console.error("API Error: Server responded with an HTML page instead of JSON for the /exams endpoint.");
+        console.error("API Error: Server responded with an HTML page instead of JSON for the /api/exams endpoint.");
         toast.error('Lỗi cấu hình server.');
         setApiError(errorMessage);
         setExams([]);
@@ -74,10 +73,12 @@ const AdminExamUpload: React.FC = () => {
       }
 
       if (Array.isArray(response.data)) {
-        setExams(response.data);
+        // Sort exams by creation date, newest first
+        const sortedExams = response.data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        setExams(sortedExams);
       } else {
         const errorMessage = 'Dữ liệu nhận được từ server không hợp lệ (không phải là một mảng).';
-        console.error("API response for /exams is not an array:", response.data);
+        console.error("API response for /api/exams is not an array:", response.data);
         toast.error(errorMessage);
         setApiError(errorMessage);
         setExams([]);
@@ -137,10 +138,10 @@ const AdminExamUpload: React.FC = () => {
 
     try {
       if (editingExam) {
-        await axiosInstance.put(`/exams/${editingExam._id}`, examData);
+        await axiosInstance.put(`/api/exams/${editingExam._id}`, examData);
         toast.success('Cập nhật đề thi thành công!');
       } else {
-        await axiosInstance.post('/exams/create-html-post', examData);
+        await axiosInstance.post('/api/exams/create-html-post', examData);
         toast.success('Lưu đề thi thành công!');
       }
       resetForm();
@@ -164,7 +165,7 @@ const AdminExamUpload: React.FC = () => {
     if (!deleteConfirm) return;
     setIsLoading(true);
     try {
-      await axiosInstance.delete(`/exams/${deleteConfirm._id}`);
+      await axiosInstance.delete(`/api/exams/${deleteConfirm._id}`);
       toast.success('Đã xóa đề thi thành công!');
       setDeleteConfirm(null);
       fetchExams();
