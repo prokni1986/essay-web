@@ -1,18 +1,16 @@
-// file: routes/examRoutes.js
-
 import express from 'express';
 const router = express.Router();
 
 // Import các models và middleware cần thiết
 import Exam from '../models/Exam.js';
 import UserSubscription from '../models/UserSubscription.js';
-import authenticateTokenOptional from '../config/authMiddlewareOptional.js';
-// import multer from 'multer'; // Bạn có thể cần cho các route upload/update sau này
+import authenticateToken from '../config/authMiddleware.js'; // Bảo vệ các route cần đăng nhập
+import authenticateTokenOptional from '../config/authMiddlewareOptional.js'; // Cho phép khách xem preview
 
-// Lấy danh sách tất cả đề thi (có thể thêm phân trang, lọc sau)
+// 1. LẤY DANH SÁCH TẤT CẢ ĐỀ THI
 router.get('/', async (req, res) => {
     try {
-        // Tối ưu: Không gửi htmlContent khi lấy danh sách
+        // Tối ưu: Không gửi htmlContent nặng nề khi chỉ lấy danh sách
         const exams = await Exam.find({}).select('-htmlContent').sort({ year: -1, createdAt: -1 });
         res.json(exams);
     } catch (err) {
@@ -21,7 +19,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Lấy chi tiết một đề thi theo id - ĐÃ HOÀN THIỆN LOGIC KIỂM TRA QUYỀN
+// 2. LẤY CHI TIẾT MỘT ĐỀ THI (VỚI LOGIC KIỂM TRA QUYỀN)
 router.get('/:id', authenticateTokenOptional, async (req, res) => {
     try {
         const exam = await Exam.findById(req.params.id).populate('topic');
@@ -29,55 +27,34 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
             return res.status(404).json({ message: "Không tìm thấy đề thi." });
         }
 
-        // <<<< BẮT ĐẦU LOGIC KIỂM TRA QUYỀN >>>>
         let canViewFullContent = false;
-        let subscriptionStatus = 'none'; // Các trạng thái: 'none', 'subscribed_specific', 'full_access'
-        
-        // Tạo nội dung xem trước cơ bản từ mô tả hoặc một phần nội dung
+        let subscriptionStatus = 'none';
         const previewContentText = exam.description || "Vui lòng đăng ký để xem nội dung đầy đủ của đề thi và lời giải.";
 
-        // Nếu người dùng đã đăng nhập (có token hợp lệ)
         if (req.user) {
             const userId = req.user.id;
-
-            // 1. Kiểm tra quyền truy cập toàn bộ (Full Access)
-            const fullAccessSub = await UserSubscription.findOne({
-                user: userId,
-                hasFullAccess: true,
-                isActive: true
-            });
+            const fullAccessSub = await UserSubscription.findOne({ user: userId, hasFullAccess: true, isActive: true });
 
             if (fullAccessSub) {
                 canViewFullContent = true;
                 subscriptionStatus = 'full_access';
             } else {
-                // 2. Nếu không có, kiểm tra subscription cho đề thi cụ thể này
                 const specificExamSub = await UserSubscription.findOne({
                     user: userId,
-                    subscribedItem: exam._id, // ID của đề thi
-                    onModel: 'Exam',         // Quan trọng: Chỉ định model là 'Exam'
+                    subscribedItem: exam._id,
+                    onModel: 'Exam',
                     isActive: true
                 });
-
                 if (specificExamSub) {
                     canViewFullContent = true;
                     subscriptionStatus = 'subscribed_specific';
                 }
             }
         }
-        
-        // <<<< KẾT THÚC LOGIC KIỂM TRA QUYỀN >>>>
 
-        // Trả về dữ liệu dựa trên quyền truy cập
         if (canViewFullContent) {
-            // Nếu có quyền, trả về toàn bộ dữ liệu
-            res.json({
-                ...exam.toObject(),
-                canViewFullContent: true,
-                subscriptionStatus: subscriptionStatus,
-            });
+            res.json({ ...exam.toObject(), canViewFullContent: true, subscriptionStatus: subscriptionStatus });
         } else {
-            // Nếu không có quyền, chỉ trả về thông tin cơ bản và preview
             res.json({
                 _id: exam._id,
                 title: exam.title,
@@ -87,34 +64,87 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
                 province: exam.province,
                 topic: exam.topic,
                 canViewFullContent: false,
-                previewContent: previewContentText, // Nội dung xem trước
+                previewContent: previewContentText,
                 subscriptionStatus: subscriptionStatus,
-                htmlContent: null, // QUAN TRỌNG: Không gửi nội dung đầy đủ
+                htmlContent: null,
                 message: "Bạn cần đăng ký để xem toàn bộ nội dung này."
             });
         }
-
     } catch (err) {
         console.error("Error fetching single exam:", err);
         res.status(500).json({ message: "Lỗi máy chủ khi lấy chi tiết đề thi." });
     }
 });
 
+// 3. TẠO MỘT ĐỀ THI MỚI TỪ NỘI DUNG HTML <<<< ROUTE MỚI ĐỂ SỬA LỖI 404
+router.post('/create-html-post', authenticateToken, async (req, res) => {
+    // BẢO MẬT: Thêm logic kiểm tra quyền Admin ở đây
+    // Ví dụ:
+    // if (!req.user || req.user.email !== process.env.ADMIN_EMAIL) {
+    //     return res.status(403).json({ message: "Truy cập bị từ chối. Yêu cầu quyền Admin." });
+    // }
 
-// Thêm các route khác cho Exam (POST, PUT, DELETE) ở đây nếu cần
-// Ví dụ: Route tạo mới đề thi
-/*
-router.post('/', authenticateToken, async (req, res) => {
-    // Thêm logic kiểm tra quyền admin ở đây
     try {
         const { title, description, htmlContent, subject, year, province } = req.body;
-        const newExam = new Exam({ title, description, htmlContent, subject, year, province });
+        
+        // Kiểm tra các trường bắt buộc
+        if (!title || !htmlContent || !subject || !year) {
+            return res.status(400).json({ message: "Thiếu các thông tin bắt buộc (title, htmlContent, subject, year)." });
+        }
+
+        const newExam = new Exam({
+            title,
+            description,
+            htmlContent,
+            subject,
+            year,
+            province
+        });
+
         await newExam.save();
-        res.status(201).json(newExam);
-    } catch(err) {
-        res.status(400).json({ message: err.message });
+        res.status(201).json({ message: "Lưu đề thi thành công!", data: newExam });
+    } catch (err) {
+        console.error("Error creating new exam from HTML:", err);
+        if (err.name === 'ValidationError') {
+            return res.status(400).json({ message: err.message });
+        }
+        res.status(500).json({ message: "Lỗi máy chủ khi tạo đề thi." });
     }
 });
-*/
+
+
+// 4. CẬP NHẬT MỘT ĐỀ THI
+router.put('/:id', authenticateToken, async (req, res) => {
+    // Thêm logic kiểm tra quyền Admin ở đây
+    try {
+        const updatedExam = await Exam.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+        if (!updatedExam) {
+            return res.status(404).json({ message: 'Không tìm thấy đề thi để cập nhật.' });
+        }
+        res.json({ message: "Cập nhật đề thi thành công!", data: updatedExam });
+    } catch (err) {
+        console.error("Error updating exam:", err);
+        if (err.name === 'ValidationError') {
+            return res.status(400).json({ message: err.message });
+        }
+        res.status(500).json({ message: "Lỗi máy chủ khi cập nhật đề thi." });
+    }
+});
+
+// 5. XÓA MỘT ĐỀ THI
+router.delete('/:id', authenticateToken, async (req, res) => {
+    // Thêm logic kiểm tra quyền Admin ở đây
+    try {
+        const deletedExam = await Exam.findByIdAndDelete(req.params.id);
+        if (!deletedExam) {
+            return res.status(404).json({ message: 'Không tìm thấy đề thi để xóa.' });
+        }
+        res.json({ message: `Đã xóa thành công đề thi: "${deletedExam.title}"` });
+    } catch (err) {
+        console.error("Error deleting exam:", err);
+        res.status(500).json({ message: "Lỗi máy chủ khi xóa đề thi." });
+    }
+});
+
 
 export default router;
