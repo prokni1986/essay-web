@@ -30,6 +30,8 @@ import AdminExamUpload from './components/AdminExamUpload'; // << Dòng mới
 import AllExamsPage from './pages/AllExamsPage'; // <<<< ADD THIS LINE
 import ExamPage from './pages/ExamPage'; 
 import AdminUploadExam from './components/AdminUploadExam' // Giả sử bạn có một component để upload exam
+import LecturesPage from './pages/LecturesPage'; // Giả sử bạn có một trang Lectures
+import NewsPage from './pages/NewsPage'; // Giả sử bạn có một trang News
 // (Tùy chọn) Import các trang cần bảo vệ khác nếu có
 // import UserProfilePage from './pages/UserProfilePage';
 // import MySubscriptionsPage from './pages/MySubscriptionsPage';
@@ -48,16 +50,17 @@ const App = () => (
           <Routes>
             {/* Public Routes - Các route ai cũng có thể truy cập */}
             <Route path="/" element={<Index />} />
-            <Route path="/gigs" element={<Gigs />} />
-            <Route path="/sampleessay" element={<AllEssaysPage />} /> {/* Đổi SampleEssay thành AllEssaysPage cho đường dẫn này nếu nó là trang danh sách */}
+            <Route path="/tieng-anh" element={<Gigs />} />
+            <Route path="/bai-van-mau" element={<AllEssaysPage />} /> {/* Đổi SampleEssay thành AllEssaysPage cho đường dẫn này nếu nó là trang danh sách */}
             <Route path="/sampleessay/:id" element={<SampleEssay />} /> {/* Giữ nguyên cho trang chi tiết bài luận */}
             <Route path="/topic/:topicId" element={<EssaysByTopic />} />
             <Route path="/alltopic" element={<AllTopics />} />
-            <Route path="/essays" element={<AllEssaysPage />} />
+            <Route path="/bai-luan" element={<AllEssaysPage />} />
             <Route path="/category/:categoryId" element={<EssaysByCategoryPage />} />
-
-            <Route path="/exams" element={<AllExamsPage />} /> {/* <<<< THÊM MỚI */}
+            <Route path="/mon-ngu-van" element={<LecturesPage />} /> {/* Giả sử bạn có một trang Lectures */}
+            <Route path="/de-thi" element={<AllExamsPage />} /> {/* <<<< THÊM MỚI */}
             <Route path="/exam/:id" element={<ExamPage />} /> {/* <<<< THÊM MỚI */}
+            <Route path="/tin-tuc"  element={<NewsPage />} /> {/* Giả sử bạn có một trang News */}
             {/* Authentication Routes - Các route cho đăng nhập và đăng ký */}
             
             <Route path="/login" element={<LoginPage />} />

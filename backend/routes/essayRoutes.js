@@ -59,7 +59,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 2. Lấy một bài luận theo id - ĐÃ ĐƯỢC SỬA ĐỂ KIỂM TRA QUYỀN TRUY CẬP
+// 2. Lấy một bài luận theo id - ĐÃ ĐƯỢC SỬA LỖI
 router.get('/:id', authenticateTokenOptional, async (req, res) => {
   try {
     const essay = await Essay.findById(req.params.id)
@@ -82,6 +82,7 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
 
     if (req.user) {
       const userId = req.user.id;
+      // 1. Kiểm tra quyền truy cập toàn bộ
       const fullAccessSub = await UserSubscription.findOne({
         user: userId,
         hasFullAccess: true,
@@ -92,11 +93,16 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
         canViewFullContent = true;
         subscriptionStatus = 'full_access';
       } else {
+        // 2. Nếu không, kiểm tra subscription cho bài luận cụ thể này
+        // ---- ĐOẠN MÃ ĐÃ SỬA ----
         const specificEssaySub = await UserSubscription.findOne({
           user: userId,
-          subscribedEssay: essay._id,
+          subscribedItem: essay._id, // Sửa từ 'subscribedEssay' thành 'subscribedItem'
+          onModel: 'Essay',         // Thêm điều kiện 'onModel'
           isActive: true
         });
+        // ---- KẾT THÚC SỬA ĐỔI ----
+
         if (specificEssaySub) {
           canViewFullContent = true;
           subscriptionStatus = 'subscribed_specific';
@@ -105,6 +111,7 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
     }
 
     if (canViewFullContent) {
+      // Nếu có quyền, trả về toàn bộ dữ liệu
       res.json({
         ...essay.toObject(),
         canViewFullContent: true,
@@ -112,6 +119,7 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
         previewContent: null
       });
     } else {
+      // Nếu không có quyền, chỉ trả về thông tin cơ bản và xem trước
       res.json({
         _id: essay._id,
         title: essay.title,
@@ -142,7 +150,6 @@ router.post('/upload', authenticateTokenOptional, upload.array('audioFiles', 4),
       return res.status(400).json({ error: "Thiếu tiêu đề hoặc Bài luận 1." });
     }
 
-    // Sửa lỗi TypeScript: Loại bỏ type assertion
     const files = (req.files && Array.isArray(req.files)) ? req.files.map(file => file.path) : [];
 
     const newEssay = new Essay({
@@ -159,9 +166,8 @@ router.post('/upload', authenticateTokenOptional, upload.array('audioFiles', 4),
             populate: { path: 'category', select: 'name' }
         });
     res.status(201).json({ message: 'Upload thành công!', data: populatedEssay });
-  } catch (error) { // Sửa lỗi TypeScript: Loại bỏ type annotation
+  } catch (error) {
     console.error("Error uploading essay:", error);
-    // Kiểm tra nếu lỗi là từ Mongoose Validation hoặc lỗi khác
     if (error.name === 'ValidationError') {
         return res.status(400).json({ error: error.message });
     }
@@ -180,13 +186,12 @@ router.put('/:id', authenticateTokenOptional, upload.array('audioFiles', 4), asy
 
     let updatedAudioFiles = essay.audioFiles || [];
 
-    // Sửa lỗi TypeScript: Loại bỏ type assertion
     if (req.files && Array.isArray(req.files) && req.files.length > 0) {
       updatedAudioFiles = req.files.map(file => file.path);
     } else if (req.body.audioFiles === null || (Array.isArray(req.body.audioFiles) && req.body.audioFiles.length === 0 && keepExistingAudios !== 'true')) {
         updatedAudioFiles = [];
     } else if (keepExistingAudios === 'true') {
-        // Keep current files
+        // Giữ nguyên các file audio hiện có
     }
 
     essay.title = title || essay.title;
@@ -205,7 +210,7 @@ router.put('/:id', authenticateTokenOptional, upload.array('audioFiles', 4), asy
             populate: { path: 'category', select: 'name' }
         });
     res.json(populatedEssay);
-  } catch (err) { // Sửa lỗi TypeScript: Loại bỏ type annotation
+  } catch (err) {
     console.error("Error updating essay:", err);
     if (err.name === 'ValidationError') {
         return res.status(400).json({ error: err.message });
@@ -223,7 +228,7 @@ router.delete('/:id', authenticateTokenOptional, async (req, res) => {
     }
     await Essay.findByIdAndDelete(req.params.id);
     res.json({ message: 'Đã xoá bài luận' });
-  } catch (error) { // Sửa lỗi TypeScript: Loại bỏ type annotation
+  } catch (error) {
     console.error("Error deleting essay:", error);
     res.status(500).json({ error: error.message || "Lỗi máy chủ khi xóa bài luận." });
   }
