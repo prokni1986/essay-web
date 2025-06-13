@@ -6,9 +6,9 @@ const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
-  if (token == null) {
-    return res.status(401).json({ message: 'Token không được cung cấp. Truy cập bị từ chối.' });
-  }
+  if (token == null || token.split('.').length !== 3) {
+    return res.status(401).json({ message: 'Token không hợp lệ hoặc bị lỗi định dạng.' });
+}
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);

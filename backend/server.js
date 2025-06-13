@@ -15,6 +15,9 @@ import subscriptionRoutes from './routes/subscriptionRoutes.js';
 import adminRoutes from './routes/adminRoutes.js'; // THÊM MỚI
 import { v2 as cloudinary } from 'cloudinary';
 import examRoutes from './routes/examRoutes.js'; // <<<< Bằng dòng này
+import newsRoutes from './routes/newsRoutes.js'
+import tagRoutes from './routes/tagRoutes.js';
+import noticeRoutes from './routes/noticeRoutes.js';
 dotenv.config();
 
 const app = express();
@@ -85,6 +88,9 @@ app.use('/api/topics', topicRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes); // <<<< THÊM MỚI
 app.use('/api/exams', examRoutes);
+app.use('/api/news', newsRoutes);
+app.use('/api/tags', tagRoutes);
+app.use('/api/notices', noticeRoutes);
 // Route cơ bản để kiểm tra server
 app.get('/', (req, res) => {
   res.send('Essay Web API is running with Authentication! 🚀');

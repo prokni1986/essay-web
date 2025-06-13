@@ -1,36 +1,47 @@
+// backend/models/Exam.js
+
 import mongoose from 'mongoose';
 
 const ExamSchema = new mongoose.Schema({
-  title: { // Ví dụ: "Đề thi tuyển sinh lớp 10 môn Toán - Thái Bình 2025"
-    type: String,
-    required: [true, "Tiêu đề đề thi là bắt buộc."],
-  },
-  description: { // Mô tả ngắn gọn
-    type: String,
+  title: { type: String, required: [true, "Tiêu đề là bắt buộc."] },
+  description: { type: String },
+  htmlContent: { type: String, required: [true, "Nội dung HTML là bắt buộc."] },
+  subject: { type: String, required: true },
+  year: { type: Number, required: true },
+  province: { type: String },
+  topic: { type: mongoose.Schema.Types.ObjectId, ref: 'Topic' },
+  
+  thumbnailUrl: {
+    type: String, // Sẽ lưu URL ảnh từ Cloudinary
     required: false,
   },
-  htmlContent: { // Trường để lưu toàn bộ HTML của đề thi và lời giải
+
+  type: { // Loại đề thi: Chính thức / Thi thử / Đề ôn tập / Đề thi chuyên
     type: String,
-    required: [true, "Nội dung HTML là bắt buộc."],
+    enum: ['Chính thức', 'Thi thử', 'Đề ôn tập', 'Đề thi chuyên'], // THÊM CÁC TÙY CHỌN MỚI
+    default: 'Chính thức',
+    required: false,
   },
-  subject: { // Ví dụ: "Toán", "Ngữ Văn", "Tiếng Anh"
-    type: String,
-    required: true,
-  },
-  year: { // Ví dụ: 2025
+  duration: { // Thời gian làm bài (phút)
     type: Number,
-    required: true,
+    required: false,
   },
-  province: { // Ví dụ: "Thái Bình", "Hà Nội"
+  questions: { // Số lượng câu hỏi
+    type: Number,
+    required: false,
+  },
+  difficulty: { // Độ khó của đề thi
     type: String,
+    enum: ['Dễ', 'Trung bình', 'Khó', 'Rất khó'],
+    default: 'Trung bình',
     required: false,
   },
-  // Bạn vẫn có thể giữ lại topic nếu muốn phân loại chi tiết hơn
-  topic: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Topic',
+  grade: { // THÊM TRƯỜNG "LỚP"
+    type: Number,
+    enum: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], // Các lớp phổ biến
     required: false,
   },
+
 }, {
   timestamps: true,
 });
