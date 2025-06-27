@@ -48,7 +48,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL_ONTHIHUB,
   process.env.FRONTEND_URL_VERCEL,
   process.env.FRONTEND_URL_LOCAL || 'http://localhost:8080',
-  'https://onthihub.com/',
+  'onthihub.com/','http://onthihub.com',
   'https://essay-web-neon.vercel.app',
   
 ].filter(Boolean);
