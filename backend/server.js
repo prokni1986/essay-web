@@ -45,6 +45,7 @@ if (process.env.CLOUDINARY_URL || (process.env.CLOUDINARY_CLOUD_NAME && process.
 
 // Cấu hình CORS
 const allowedOrigins = [
+  process.env.FRONTEND_URL_ONTHIHUB,
   process.env.FRONTEND_URL_VERCEL,
   process.env.FRONTEND_URL_LOCAL || 'http://localhost:8080',
   'https://essay-web-1.onrender.com',
