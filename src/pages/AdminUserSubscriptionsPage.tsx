@@ -1,68 +1,29 @@
-// src/pages/AdminUserSubscriptionsPage.tsx
-import React, { useEffect, useState, useCallback, ReactNode } from 'react';
-import axios, { AxiosError } from 'axios';
+// src/pages/AdminUserSubscriptionsPage.tsx (Giao diện cuối cùng, đã đồng bộ theme)
+
+import React, { useEffect, useState, useCallback } from 'react';
 import { toast } from 'sonner';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+// Import các component và hook cần thiết từ dự án của bạn
+import axiosInstance from '@/lib/axiosInstance';
+import { useAuth } from '@/hooks/useAuth';
+import Layout from '@/components/Layout';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
-import { Trash2, Power, PowerOff } from 'lucide-react';
-
-// =================================================================================
-// CÁC COMPONENT VÀ HOOKS MOCK ĐỂ GIẢI QUYẾT LỖI BUILD
-// Do môi trường hiện tại không thể giải quyết các đường dẫn import tùy chỉnh,
-// chúng ta sẽ định nghĩa các phần phụ thuộc này trực tiếp tại đây.
-// Trong dự án thực tế của bạn, bạn nên sử dụng các file import gốc.
-// =================================================================================
-
-// --- 1. Mock Layout Component ---
-const Layout: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <div className="bg-gray-900">{children}</div>
-);
-
-// --- 2. Mock useAuth Hook ---
-// Hook này giả định rằng người dùng đã được xác thực và là admin.
-const useAuth = () => {
-    // Trong dự án thực của bạn, logic này sẽ lấy từ context
-    const [mockUser] = useState({
-        // QUAN TRỌNG: Thay thế bằng email admin thực tế của bạn hoặc biến môi trường
-        email: 'your-admin-email@example.com' 
-    });
-    return {
-        isAuthenticated: true,
-        isLoading: false,
-        user: mockUser,
-    };
-};
-
-// --- 3. Định nghĩa axiosInstance ---
-const axiosInstance = axios.create({
-  // Sửa đổi: Sử dụng URL backend từ biến môi trường của Vite.
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-});
-
-// Interceptor để tự động đính kèm token
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Mail, Power, PowerOff, Trash2, User } from 'lucide-react';
 
 
-// =================================================================================
-// CÁC ĐỊNH NGHĨA KIỂU DỮ LIỆU (TYPESCRIPT INTERFACES)
-// =================================================================================
+// --- Định nghĩa kiểu dữ liệu (Interfaces) ---
 interface SubscriptionItem {
   _id: string;
   title: string;
 }
-
 interface UserSubscription {
   _id: string;
   subscribedItem?: SubscriptionItem | null;
@@ -72,75 +33,54 @@ interface UserSubscription {
   planType?: string;
   isActive: boolean;
 }
-
 interface UserInfo {
   _id: string;
   username: string;
   email: string;
   createdAt: string;
 }
-
 interface UserWithSubscriptions extends UserInfo {
   subscriptions: UserSubscription[];
 }
 
-interface ApiErrorResponse {
-  message?: string;
-}
-
-// =================================================================================
-// COMPONENT CHÍNH: AdminUserSubscriptionsPage
-// =================================================================================
+// --- Component chính ---
 const AdminUserSubscriptionsPage: React.FC = () => {
   const [usersData, setUsersData] = useState<UserWithSubscriptions[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { user: authUser, isAuthenticated, isLoading: authIsLoading } = useAuth();
-  const navigate = useNavigate();
-  
+  const { isLoading: authIsLoading } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<UserSubscription | null>(null);
 
-  // SỬA LỖI: Sử dụng email từ mock hook. Trong dự án của bạn, hãy dùng import.meta.env.VITE_ADMIN_EMAIL
-  const isAdmin = authUser?.email === 'your-admin-email@example.com';
-
+  // --- Các hàm xử lý logic ---
   const fetchData = useCallback(async () => {
-    if (!isAuthenticated || !isAdmin) return;
     setLoading(true);
+    setError(null);
     try {
       const response = await axiosInstance.get<UserWithSubscriptions[]>('/api/admin/users-subscriptions');
-      setUsersData(response.data);
-      setError(null);
+      setUsersData(response.data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     } catch (err) {
-      console.error("Error fetching data:", err);
-      const errorMessage = "Không thể tải dữ liệu.";
+      const errorMessage = "Không thể tải dữ liệu người dùng.";
       setError(errorMessage);
       toast.error(errorMessage);
+      console.error("Error fetching user subscriptions:", err);
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, isAdmin]);
+  }, []);
 
   useEffect(() => {
-    if (authIsLoading) return;
-    if (!isAuthenticated || !isAdmin) {
-      toast.error("Truy cập bị từ chối. Yêu cầu quyền Admin.");
-      navigate('/');
-      return;
-    }
     fetchData();
-  }, [isAuthenticated, isAdmin, authIsLoading, navigate, fetchData]);
+  }, [fetchData]);
 
-  // === HANDLER FUNCTIONS FOR ADMIN ACTIONS ===
   const handleToggleActive = async (subId: string) => {
     setIsProcessing(true);
     try {
       const response = await axiosInstance.put(`/api/admin/subscriptions/${subId}/toggle-active`);
       toast.success(response.data.message || 'Cập nhật trạng thái thành công!');
-      fetchData();
+      await fetchData();
     } catch (error) {
       toast.error("Cập nhật trạng thái thất bại.");
-      console.error("Toggle active error:", error);
     } finally {
       setIsProcessing(false);
     }
@@ -153,19 +93,21 @@ const AdminUserSubscriptionsPage: React.FC = () => {
       await axiosInstance.delete(`/api/admin/subscriptions/${deleteConfirm._id}`);
       toast.success('Xóa gói đăng ký thành công!');
       setDeleteConfirm(null);
-      fetchData();
+      await fetchData();
     } catch (error) {
       toast.error("Xóa gói đăng ký thất bại.");
-      console.error("Delete sub error:", error);
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // --- Giao diện (UI) ---
   if (loading || authIsLoading) {
     return (
       <Layout>
-        <div className="container mx-auto p-4 text-center text-white">Đang tải dữ liệu...</div>
+        <div className="flex h-screen items-center justify-center bg-background">
+          <p className="text-muted-foreground">Đang tải dữ liệu...</p>
+        </div>
       </Layout>
     );
   }
@@ -173,86 +115,118 @@ const AdminUserSubscriptionsPage: React.FC = () => {
   if (error) {
     return (
       <Layout>
-        <div className="container mx-auto p-4 text-center text-red-500">{error}</div>
+        <div className="flex h-screen items-center justify-center bg-background">
+          <p className="text-destructive">{error}</p>
+        </div>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="container mx-auto p-4 md:p-8 text-white">
-        <header className="mb-8">
-          <h1 className="text-3xl font-bold text-yellow-400">Quản lý Người dùng & Gói Đăng Ký</h1>
-        </header>
-
-        {usersData.map((userData) => (
-          <div key={userData._id} className="mb-10 p-6 bg-gray-800 rounded-lg shadow-xl">
-            <h2 className="text-2xl font-semibold text-yellow-300 mb-1">User: {userData.username}</h2>
-            <p className="text-sm text-gray-400 mb-4">Email: {userData.email}</p>
-
-            <h3 className="text-lg font-medium text-gray-200 mt-4 mb-2">Gói Đăng Ký ({userData.subscriptions.length}):</h3>
-            {userData.subscriptions.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-gray-600">
-                    <TableHead className="text-yellow-400">Loại</TableHead>
-                    <TableHead className="text-yellow-400">Chi tiết</TableHead>
-                    <TableHead className="text-yellow-400">Trạng thái</TableHead>
-                    <TableHead className="text-yellow-400 text-right">Hành động</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {userData.subscriptions.map(sub => (
-                    <TableRow key={sub._id} className="border-gray-600">
-                      <TableCell>
-                        {sub.hasFullAccess ? 
-                          <Badge className="bg-blue-500">Full Access</Badge> : 
-                          <Badge className="bg-green-600">Bài lẻ</Badge>
-                        }
-                      </TableCell>
-                      <TableCell className="text-gray-300">
-                          {sub.subscribedItem?.title || (sub.hasFullAccess ? 'Tất cả nội dung' : 'N/A')}
-                      </TableCell>
-                      <TableCell>
-                        {sub.isActive ? 
-                          <Badge variant="outline" className="border-green-500 text-green-400">Active</Badge> : 
-                          <Badge variant="outline" className="border-red-500 text-red-400">Inactive</Badge>
-                        }
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="icon" onClick={() => handleToggleActive(sub._id)} disabled={isProcessing} aria-label="Toggle Status">
-                           {sub.isActive ? <PowerOff className="h-4 w-4 text-orange-400"/> : <Power className="h-4 w-4 text-green-400"/>}
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => setDeleteConfirm(sub)} disabled={isProcessing} aria-label="Delete Subscription">
-                           <Trash2 className="h-4 w-4 text-red-500"/>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-gray-400 italic">Người dùng này chưa có subscription nào.</p>
-            )}
-          </div>
-        ))}
-      </div>
-      
-      {/* Modal Xác Nhận Xóa */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 shadow-xl w-full max-w-md border border-gray-700">
-            <h3 className="text-xl font-bold text-white">Xác nhận Xóa</h3>
-            <p className="my-4 text-gray-300">
-              Bạn có chắc chắn muốn xóa vĩnh viễn gói đăng ký <br/>
-              <span className="font-bold text-yellow-400">
-                {deleteConfirm.hasFullAccess ? "Full Access" : `"${deleteConfirm.subscribedItem?.title || 'này'}"`}
-              </span>?
+      <div className="bg-background text-foreground min-h-screen">
+        <main className="container mx-auto px-4 py-8 md:py-12">
+          <header className="mb-8">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">
+              Quản lý Người dùng
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Xem và quản lý các gói đăng ký của tất cả người dùng trong hệ thống.
             </p>
-            <div className="mt-6 flex justify-end gap-4">
-              <Button variant="outline" onClick={() => setDeleteConfirm(null)} className="text-white border-gray-500">Hủy</Button>
+          </header>
+
+          <Accordion type="single" collapsible className="w-full space-y-4">
+            {usersData.length > 0 ? usersData.map((userData) => (
+              <AccordionItem key={userData._id} value={userData._id} className="bg-card border rounded-lg data-[state=open]:border-primary/50">
+                <AccordionTrigger className="p-4 hover:no-underline rounded-t-lg hover:bg-muted/50 data-[state=open]:rounded-b-none data-[state=open]:bg-muted">
+                  <div className="flex justify-between items-center w-full">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 text-xl font-semibold text-foreground">
+                        <User size={20} className="text-primary" />
+                        {userData.username}
+                      </div>
+                      <div className="hidden md:flex items-center gap-2 text-sm text-muted-foreground">
+                        <Mail size={16} />
+                        {userData.email}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground pr-2">
+                      Ngày tham gia: {new Date(userData.createdAt).toLocaleDateString('vi-VN')}
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="p-4 pt-2 border-t">
+                  <h3 className="text-base font-medium text-muted-foreground mb-3">
+                    Các gói đang sở hữu ({userData.subscriptions.length}):
+                  </h3>
+                  {userData.subscriptions.length > 0 ? (
+                    <div className="overflow-x-auto border rounded-md">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent border-b-border">
+                            <TableHead>Loại Gói</TableHead>
+                            <TableHead>Chi Tiết Gói</TableHead>
+                            <TableHead>Trạng Thái</TableHead>
+                            <TableHead className="text-right">Hành Động</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {userData.subscriptions.map(sub => (
+                            <TableRow key={sub._id} className="border-border">
+                              <TableCell>
+                                {sub.hasFullAccess ?
+                                  <Badge variant="secondary">Full Access</Badge> :
+                                  <Badge variant="default">Bài Viết Lẻ</Badge>
+                                }
+                              </TableCell>
+                              <TableCell className="font-medium">{sub.subscribedItem?.title || (sub.hasFullAccess ? 'Toàn bộ nội dung' : 'N/A')}</TableCell>
+                              <TableCell>
+                                {sub.isActive ?
+                                  <Badge variant="outline" className="border-green-500 text-green-500">Hoạt động</Badge> :
+                                  <Badge variant="destructive">Vô hiệu</Badge>
+                                }
+                              </TableCell>
+                              <TableCell className="text-right space-x-1">
+                                <Button variant="ghost" size="icon" onClick={() => handleToggleActive(sub._id)} disabled={isProcessing}>
+                                  {sub.isActive ? <PowerOff className="h-4 w-4 text-orange-500" /> : <Power className="h-4 w-4 text-green-500" />}
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => setDeleteConfirm(sub)} disabled={isProcessing}>
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground italic text-center py-4">Chưa có gói đăng ký nào.</p>
+                  )}
+                </AccordionContent>
+              </AccordionItem>
+            )) : (
+              <div className="text-center py-10 bg-card rounded-lg border">
+                <p className="text-muted-foreground">Không có dữ liệu người dùng nào để hiển thị.</p>
+              </div>
+            )}
+          </Accordion>
+        </main>
+      </div>
+
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+          <div className="bg-card border rounded-lg p-6 shadow-lg w-full max-w-md m-4">
+            <h3 className="text-lg font-semibold text-foreground">Xác Nhận Xóa</h3>
+            <p className="text-sm text-muted-foreground mt-2">
+              Bạn có chắc muốn xóa vĩnh viễn gói đăng ký này không? Hành động này không thể hoàn tác.
+            </p>
+            <p className="my-4 font-semibold text-primary">
+              {deleteConfirm.hasFullAccess ? "Full Access" : `"${deleteConfirm.subscribedItem?.title || ''}"`}
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Hủy</Button>
               <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isProcessing}>
-                {isProcessing ? 'Đang xóa...' : 'Xác Nhận Xóa'}
+                {isProcessing ? 'Đang xóa...' : 'Xác Nhận'}
               </Button>
             </div>
           </div>
@@ -260,13 +234,6 @@ const AdminUserSubscriptionsPage: React.FC = () => {
       )}
     </Layout>
   );
-};
-
-// This export is needed for your project, but won't be used in this isolated environment.
-// In a real project, you would have a file structure where `useNavigate` would be available.
-// For now, we mock it to prevent further errors.
-const useNavigate = () => (path: string) => {
-  console.log(`Navigating to ${path}`);
 };
 
 export default AdminUserSubscriptionsPage;

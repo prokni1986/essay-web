@@ -5,72 +5,84 @@
 @tailwind utilities;
 
 @layer base {
-  /* :root định nghĩa các biến màu cho THEME SÁNG (Mặc định) */
+  /* Định nghĩa các biến CSS cho theme SÁNG (mặc định) */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 142.1 76.2% 36.3%; /* Giữ màu xanh lá cây */
-    --primary-foreground: 355.7 100% 97.3%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 215.4 16.3% 46.9%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 142.1 76.2% 36.3%;
-    --radius: 0.5rem;
+    --background: 0 0% 100%; /* Trắng */
+    --foreground: 222.2 84% 4.9%; /* Gần như đen (xám xanh đậm) - màu chữ chính */
+
+    --card: 0 0% 100%; /* Nền card, giống background để card nổi bật bằng shadow/border */
+    --card-foreground: 222.2 84% 4.9%; /* Chữ trên card, giống foreground */
+
+    --popover: 0 0% 100%; /* Nền popover */
+    --popover-foreground: 222.2 84% 4.9%; /* Chữ trên popover */
+
+    --primary: 142 76% 36%; /* Màu chủ đạo: Xanh dương (blue-600) */
+    --primary-foreground: 0 0% 100%; /* Chữ trên màu chủ đạo: Trắng */
+
+    --secondary: 210 40% 96.1%; /* Màu phụ: Xám rất nhạt (cho các section xen kẽ) */
+    --secondary-foreground: 215.4 16.3% 46.9%; /* Chữ trên màu phụ: Xám đậm */
+
+    --muted: 210 40% 96.1%; /* Màu nền cho các phần tử "muted" */
+    --muted-foreground: 215.4 16.3% 46.9%; /* Màu chữ cho các phần tử "muted" */
+
+    --accent: 150 60% 88%; /* Màu nhấn: Xám nhạt (thường dùng cho hover/focus) */
+    --accent-foreground: 222.2 47.4% 11.2%; /* Chữ trên màu nhấn */
+
+    --destructive: 0 84.2% 60.2%; /* Màu cảnh báo/lỗi: Đỏ */
+    --destructive-foreground: 210 40% 98%; /* Chữ trên màu cảnh báo */
+
+    --border: 214.3 31.8% 91.4%; /* Màu viền */
+    --input: 214.3 31.8% 91.4%; /* Màu nền input */
+    --ring: 221.2 83.2% 53.1%; /* Màu viền khi focus */
+
+    --radius: 0.5rem; /* Border radius mặc định */
   }
 
-  /* [CHỈNH SỬA] 
-    Thay thế toàn bộ khối .dark cũ bằng khối .dark mới dưới đây.
-  */
+  /* Định nghĩa các biến CSS cho theme TỐI */
   .dark {
-    --background: 222.2 84% 4.9%; /* Giữ nguyên màu nền tối */
-    
-    /* Thay đổi màu chữ chính thành trắng sáng hơn cho các tiêu đề */
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    
-    /* Thay đổi màu chủ đạo thành màu VÀNG như trong ảnh */
-    --primary: 47.9 95.8% 53.1%; 
-    /* Thay đổi màu chữ trên nút màu chủ đạo thành màu TỐI để dễ đọc */
-    --primary-foreground: 222.2 84% 4.9%; 
-    
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    
-    /* Thay đổi màu chữ phụ thành xám SÁNG HƠN cho các đoạn mô tả */
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 75.1%; /* Tăng độ sáng từ 65.1% lên 75.1% */
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-
-    /* Cập nhật màu của ring (viền focus) để khớp với màu chủ đạo mới */
-    --ring: 47.9 95.8% 53.1%;
+    --background: 235 15% 10%;          /* Rất tối, xanh than nhẹ */
+    --foreground: 0 0% 100%;            /* Trắng thuần cho chữ chính */
+  
+    --card: 235 15% 14%;                /* Tối hơn background một chút */
+    --card-foreground: 0 0% 100%;       /* Trắng trên card */
+  
+    --popover: 235 15% 12%;
+    --popover-foreground: 0 0% 100%;
+  
+    --primary: 220 90% 60%;             /* Xanh dương mạnh - màu chủ đạo */
+    --primary-foreground: 0 0% 100%;
+  
+    --secondary: 240 10% 20%;           /* Xám tím nhẹ, làm nền phụ */
+    --secondary-foreground: 0 0% 100%;
+  
+    --muted: 240 6% 18%;                /* Màu nền muted, hơi tím */
+    --muted-foreground: 220 8% 70%;     /* Xám nhạt dễ đọc */
+  
+    --accent: 160 100% 35%;             /* Màu nhấn xanh lá hơi neon */
+    --accent-foreground: 0 0% 100%;
+  
+    --destructive: 0 80% 50%;           /* Đỏ nổi bật cảnh báo */
+    --destructive-foreground: 0 0% 100%;
+  
+    --border: 240 4% 25%;               /* Viền nhẹ, hơi xám tím */
+    --input: 240 6% 16%;
+    --ring: 220 90% 60%;                /* Viền focus: màu chủ đạo */
   }
 
-  /* Phần còn lại của file giữ nguyên */
+  /* Áp dụng các biến CSS cho các thuộc tính Tailwind */
   * {
     @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Custom utility class for rounded buttons */
+  .button-rounded-full {
+    border-radius: 9999px !important;
   }
 }

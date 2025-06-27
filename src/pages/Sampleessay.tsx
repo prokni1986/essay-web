@@ -1,12 +1,17 @@
 // src/pages/SampleEssay.tsx
-import React, { useEffect, useState, useCallback } from 'react';
+"use client";
+
+import * as React from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'; // Đảm bảo useMemo được import
 import axios from 'axios';
 import axiosInstance from '../lib/axiosInstance';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
-import { useAuth } from '../contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../components/theme-provider';
+import Breadcrumbs, { BreadcrumbItem } from '@/components/Breadcrumbs'; // Import Breadcrumbs và BreadcrumbItem
 
 // --- Interfaces ---
 interface EssayTopic {
@@ -43,6 +48,139 @@ const getShortTitle = (title: string | undefined, maxLength: number = 30): strin
   return title.substring(0, maxLength).trimEnd() + '...';
 };
 
+// Format time from seconds
+const formatTime = (seconds: number): string => {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+};
+
+interface CustomAudioPlayerProps {
+  audioSrc: string | undefined;
+  initialDuration: number;
+  variant: 'dark' | 'light'; // Thêm variant để điều khiển màu sắc
+}
+
+const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({ audioSrc, initialDuration, variant }) => {
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
+  const [currentTime, setCurrentTime] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(initialDuration);
+
+  // Determine colors based on variant and dark mode
+  // Using theme-based colors for consistency
+  const bgColor = variant === 'dark'
+    ? 'bg-primary text-primary-foreground' // Primary color for dark variant
+    : 'bg-muted/30 text-foreground'; // Muted for light variant background, foreground text
+  const textColor = variant === 'dark'
+    ? 'text-primary-foreground' // Text color for primary background
+    : 'text-foreground'; // Default foreground text
+  const iconColor = variant === 'dark'
+    ? 'text-primary-foreground' // Icon color for dark variant, contrasting with background
+    : 'text-primary'; // Icon color for light variant
+  const progressBarBg = variant === 'dark'
+    ? 'bg-primary-foreground/30' // Lighter version of foreground for dark variant progress bar background
+    : 'bg-primary/20'; // Lighter primary for light variant progress bar background
+  const progressBarFill = variant === 'dark'
+    ? 'bg-primary-foreground' // Foreground color for dark variant progress bar fill
+    : 'bg-primary'; // Primary color for light variant progress bar fill
+  const buttonBg = variant === 'dark'
+    ? 'bg-primary-foreground' // Button background contrasting with dark variant
+    : 'bg-background'; // Button background for light variant
+
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const updateTime = () => {
+      setCurrentTime(audio.currentTime);
+      setProgress((audio.currentTime / audio.duration) * 100 || 0);
+    };
+
+    const setAudioData = () => {
+      setDuration(isFinite(audio.duration) ? audio.duration : initialDuration);
+      setCurrentTime(audio.currentTime);
+    };
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setProgress(0);
+      setCurrentTime(0);
+      if (audio) audio.currentTime = 0;
+    };
+
+    audio.addEventListener('timeupdate', updateTime);
+    audio.addEventListener('loadedmetadata', setAudioData);
+    audio.addEventListener('play', handlePlay);
+    audio.addEventListener('pause', handlePause);
+    audio.addEventListener('ended', handleEnded);
+
+    return () => {
+      audio.removeEventListener('timeupdate', updateTime);
+      audio.removeEventListener('loadedmetadata', setAudioData);
+      audio.removeEventListener('play', handlePlay);
+      audio.removeEventListener('pause', handlePause);
+      audio.removeEventListener('ended', handleEnded);
+    };
+  }, [initialDuration]);
+
+  const togglePlayPause = () => {
+    const audio = audioRef.current;
+    if (audio) {
+      if (isPlaying) {
+        audio.pause();
+      } else {
+        audio.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
+  };
+
+  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const audio = audioRef.current;
+    const progressBar = e.currentTarget;
+    if (audio && progressBar) {
+      const clickX = e.nativeEvent.offsetX;
+      const width = progressBar.offsetWidth;
+      const newProgress = (clickX / width);
+      audio.currentTime = newProgress * audio.duration;
+    }
+  };
+
+  if (!audioSrc) return null;
+
+  return (
+    <div className={`w-full rounded-lg p-3 flex items-center space-x-4 shadow-lg ${bgColor} ${textColor}`}>
+      <button
+        onClick={togglePlayPause}
+        className={`w-10 h-10 flex items-center justify-center rounded-full shadow-md cursor-pointer flex-shrink-0 ${buttonBg}`}
+      >
+        <i
+          className={`fas ${isPlaying ? "fa-pause" : "fa-play"} ${iconColor} text-xl`}
+        ></i>
+      </button>
+      <div className="flex-1 flex flex-col justify-center">
+        <div className={`w-full rounded-full h-2 mb-1 cursor-pointer ${progressBarBg}`} onClick={handleProgressBarClick}>
+          <div
+            className={`h-2 rounded-full ${progressBarFill}`}
+            style={{ width: `${progress}%` }}
+          ></div>
+        </div>
+        <div className="flex justify-between text-xs font-medium">
+          <span>{formatTime(currentTime)}</span>
+          <span>{formatTime(duration)}</span>
+        </div>
+      </div>
+      <audio ref={audioRef} src={audioSrc} controlsList="nodownload" preload="metadata" className="hidden" />
+    </div>
+  );
+};
+
+
 const SampleEssay: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [essay, setEssay] = useState<EssayData | null>(null);
@@ -51,6 +189,10 @@ const SampleEssay: React.FC = () => {
   const { isAuthenticated, isLoading: authIsLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const [activeEssaySection, setActiveEssaySection] = useState<1 | 2 | 3>(1);
+
+  const { theme } = useTheme();
 
   const fetchEssay = useCallback(async () => {
     if (!id) {
@@ -99,7 +241,6 @@ const SampleEssay: React.FC = () => {
     }
   };
 
-  // SỬA LỖI: Thêm lại hàm handleSubscribeFullAccess đã thiếu
   const handleSubscribeFullAccess = async () => {
     if (!isAuthenticated) {
       toast.error("Vui lòng đăng nhập để đăng ký gói.");
@@ -119,27 +260,31 @@ const SampleEssay: React.FC = () => {
       }
     }
   };
-  
-  const renderAudioPlayer = (audioSrc: string | undefined): JSX.Element | null => {
-    if (!audioSrc) return null;
-    return (
-      <audio controls controlsList="nodownload" className="w-full max-w-[280px] rounded-lg">
-        <source src={audioSrc} type="audio/mpeg" />
-        Trình duyệt của bạn không hỗ trợ phát audio.
-      </audio>
-    );
-  };
-  
+
+  // Định nghĩa breadcrumb items (Đã thêm useMemo và cấu trúc theo component Breadcrumbs tùy chỉnh)
+  const breadcrumbItems: BreadcrumbItem[] = useMemo(() => {
+    const items: BreadcrumbItem[] = [{ label: 'Trang chủ', path: '/' }];
+    // Kiểm tra nếu có topic và là object, thì thêm vào breadcrumbs
+    if (essay?.topic && typeof essay.topic === 'object') {
+      items.push({ label: essay.topic.name, path: `/topic/${essay.topic._id}` }); // Corrected path for consistency
+    }
+    // Thêm tiêu đề bài luận hiện tại (luôn là mục cuối cùng, không có path)
+    if (essay) {
+      items.push({ label: getShortTitle(essay.title, 50) });
+    }
+    return items;
+  }, [essay]);
+
+
   if (loading || authIsLoading) {
     return (
       <Layout>
-        <div className="flex justify-center items-center min-h-screen">
-          <div className="text-center text-foreground">
-            <h1 className="text-2xl font-semibold">Đang tải chi tiết bài luận...</h1>
-            <div className="mt-4 inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" role="status">
-              <span className="sr-only">Loading...</span>
+        <div className="flex flex-col justify-center items-center min-h-screen text-center">
+            <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent" role="status">
+                <span className="sr-only">Đang tải...</span>
             </div>
-          </div>
+            <h1 className="text-2xl font-semibold text-foreground mt-4">Đang tải dữ liệu...</h1>
+            <p className="text-muted-foreground">Vui lòng chờ trong giây lát.</p>
         </div>
       </Layout>
     );
@@ -148,26 +293,22 @@ const SampleEssay: React.FC = () => {
   if (error) {
     return (
       <Layout>
-        <div className="flex justify-center items-center min-h-screen text-center px-4">
-          <div className="p-8 bg-card rounded-lg shadow-xl border max-w-md">
-            <h1 className="text-3xl font-bold text-destructive mb-4">Lỗi</h1>
-            <p className="text-muted-foreground mb-6">{error}</p>
-            <Button asChild><Link to="/essays">Quay lại Thư viện</Link></Button>
+        <div className="flex flex-col justify-center items-center min-h-screen text-center px-4">
+            <h1 className="text-3xl font-bold text-destructive">Lỗi!</h1>
+            <p className="text-muted-foreground mt-2">{error}</p>
+            <Button asChild variant="link" className="mt-4"><Link to="/">Về trang chủ</Link></Button>
           </div>
-        </div>
       </Layout>
     );
   }
 
   if (!essay) {
-     return (
+    return (
       <Layout>
-        <div className="flex justify-center items-center min-h-screen text-center px-4">
-          <div className="p-8 bg-card rounded-lg shadow-xl border max-w-md">
+        <div className="flex flex-col justify-center items-center min-h-screen text-center px-4">
             <h1 className="text-3xl font-bold text-muted-foreground">Không tìm thấy bài luận</h1>
             <Button asChild className="mt-6"><Link to="/essays">Quay lại Thư viện</Link></Button>
           </div>
-        </div>
       </Layout>
     );
   }
@@ -176,56 +317,257 @@ const SampleEssay: React.FC = () => {
   const topicName = essay.topic && typeof essay.topic === 'object' ? essay.topic.name : 'Chủ đề';
   const topicIdForLink = essay.topic && typeof essay.topic === 'object' ? essay.topic._id : null;
 
+  const essaySections = [];
+  if (essay.content) {
+    essaySections.push({
+      id: 1,
+      title: "Bài luận 1",
+      content: essay.content,
+      audio: essay.audioFiles?.[1]
+    });
+  }
+  if (essay.essay2) {
+    essaySections.push({
+      id: 2,
+      title: "Bài luận 2",
+      content: essay.essay2,
+      audio: essay.audioFiles?.[2]
+    });
+  }
+  if (essay.essay3) {
+    essaySections.push({
+      id: 3,
+      title: "Bài luận 3",
+      content: essay.essay3,
+      audio: essay.audioFiles?.[3]
+    });
+  }
+
+  const currentEssaySection = essaySections.find(sec => sec.id === activeEssaySection);
+
   return (
     <Layout>
-      <section className="py-10 px-4 bg-secondary">
-        <div className="max-w-5xl mx-auto">
-          <div className="px-4 md:px-8 py-6">
-            <nav className="mb-8 text-sm flex flex-wrap items-center text-muted-foreground space-x-2">
-              <Link to="/" className="hover:underline text-primary">Trang chủ</Link>
-              <span>/</span>
-              <Link to="/essays" className="hover:underline text-primary">Thư viện</Link>
-              {topicIdForLink && (<><span>/</span><Link to={`/topic/${topicIdForLink}`} className="hover:underline text-primary">{topicName}</Link></>)}
-              <span>/</span>
-              <span className="text-foreground font-medium truncate" title={essay.title}>{getShortTitle(essay.title)}</span>
-            </nav>
-            <h1 className="text-3xl md:text-4xl font-heading font-bold text-foreground text-justify break-words">
-              {pageTitle}
-            </h1>
+
+      {/* Breadcrumbs (Đã thay thế phần nav cũ bằng component Breadcrumbs tùy chỉnh) */}
+      <section className="bg-secondary/50 py-4 border-b border-border">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> {/* Sử dụng max-w-7xl để nhất quán với các phần khác */}
+            <Breadcrumbs items={breadcrumbItems} />
           </div>
-        </div>
       </section>
 
-      <section className="py-4 px-4 bg-background">
-        <div className="max-w-5xl mx-auto">
-          <div className="bg-background rounded-2xl p-4 md:p-8">
-            <article>
-              {essay.canViewFullContent ? (
-                <div className="space-y-6">
-                  {essay.outline && (
-                    <details className="essay-section" open>
-                      <summary className="flex items-center justify-between border-b border-border py-3 cursor-pointer list-none rounded-md group">
-                        <div className="flex items-center group-hover:text-primary transition-colors"><span className="mr-3 text-primary text-xl transition-transform duration-200 transform details-arrow">❯</span><h2 className="text-2xl font-semibold text-primary">Dàn ý</h2></div>
-                        <div className="flex-shrink-0 ml-4">{renderAudioPlayer(essay.audioFiles?.[0])}</div>
-                      </summary>
-                      <div className="mt-4 p-4 md:p-6 bg-secondary/50 rounded prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: essay.outline }} />
-                    </details>
-                  )}
-                  {essay.content && (
-                     <details className="essay-section" open>
-                      <summary className="flex items-center justify-between border-b border-border py-3 cursor-pointer list-none rounded-md group">
-                        <div className="flex items-center group-hover:text-primary transition-colors"><span className="mr-3 text-primary text-xl transition-transform duration-200 transform details-arrow">❯</span><h2 className="text-2xl font-semibold text-primary">Bài luận 1</h2></div>
-                        <div className="flex-shrink-0 ml-4">{renderAudioPlayer(essay.audioFiles?.[1])}</div>
-                      </summary>
-                      <div className="mt-4 p-4 md:p-6 bg-secondary/50 rounded prose prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: essay.content }} />
-                    </details>
-                  )}
-                   {/* Logic cho essay2, essay3 nếu có */}
+      <div className={`min-h-screen bg-background text-foreground font-sans`}>
+        {/* Header (Giữ nguyên từ code cũ) */}
+        <header className="bg-card shadow-sm border-b border-border">
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+            <div className="flex items-center">
+              <i className="fas fa-book-open text-primary text-2xl mr-3"></i>
+              <h1 className="text-xl font-semibold text-foreground">
+                Hướng dẫn viết luận
+              </h1>
+            </div>
+            <div className="text-sm text-muted-foreground">
+              {new Date().toLocaleDateString("en-US", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </div>
+          </div>
+        </header>
+
+        
+
+        <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          {/* Part 1: Essay Outline Guide (Giữ nguyên từ code cũ) */}
+          <section className="mb-16 bg-card p-4 sm:p-6 rounded-xl shadow-xl border border-border">
+            <div className="bg-primary px-6 py-8 sm:px-8 flex flex-col md:flex-row justify-between items-start md:items-center rounded-t-lg -mx-6 -mt-6">
+              {/* Corrected H2 structure for consistency and proper text/icon color */}
+              <h2 className="text-white mb-4 md:mb-0 md:flex-1 md:pr-4">
+                <i className="fas fa-flag text-primary-foreground mr-2 text-3xl"></i> {/* Icon color directly set */}
+                <span className="text-2xl font-bold">Dàn ý bài luận:</span><br />
+                <span className="text-base font-normal">{pageTitle}</span>
+              </h2>
+              <div className="w-full md:w-64">
+                {/* CustomAudioPlayer variant is 'dark' for primary background */}
+                <CustomAudioPlayer audioSrc={essay.audioFiles?.[0]} initialDuration={300} variant="dark" />
+              </div>
+            </div>
+
+            <div className="p-6 sm:p-8">
+              <div className="mb-8">
+                {/* Removed redundant H3 here, as it's now part of the main H2 above */}
+                <h3 className="text-xl font-semibold text-foreground mb-4">
+                  Cấu trúc thiết yếu
+                </h3>
+                <p className="text-muted-foreground mb-6">
+                  Một bài luận có cấu trúc tốt tuân theo một định dạng rõ ràng hướng dẫn người đọc qua lập luận của bạn một cách hợp lý và thuyết phục.
+                  Hãy làm theo dàn ý này để tạo ra những bài luận hấp dẫn, thu hút khán giả và truyền đạt ý tưởng của bạn một cách hiệu quả.
+                </p>
+
+                {essay.outline ? (
+                  <div className="border-l-0 border-primary pl-4">
+                    {/* Removed H4 here, using the overall section title */}
+                    <div className="prose dark:prose-invert max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: essay.outline }} />
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground mb-8">
+                    Không có dàn ý khả dụng.
+                  </p>
+                )}
+              </div>
+
+              {/* Additional Tips */}
+              <div className="mt-10 bg-muted/30 p-6 rounded-lg border border-border">
+                <h3 className="text-primary font-semibold mb-4 text-lg">
+                  Mẹo chuyên nghiệp để viết bài luận hiệu quả
+                </h3>
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="bg-background p-4 rounded shadow-sm border border-border">
+                    <div className="flex items-center mb-3">
+                      <i className="fas fa-lightbulb text-yellow-500 text-xl mr-2"></i> {/* Keep specific accent colors */}
+                      <h4 className="font-medium text-foreground">Rõ ràng</h4>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Sử dụng ngôn ngữ rõ ràng, súc tích và tránh các thuật ngữ không cần thiết.
+                      Mỗi câu nên đóng góp vào lập luận tổng thể của bạn.
+                    </p>
+                  </div>
+                  <div className="bg-background p-4 rounded shadow-sm border border-border">
+                    <div className="flex items-center mb-3">
+                      <i className="fas fa-link text-blue-500 text-xl mr-2"></i> {/* Keep specific accent colors */}
+                      <h4 className="font-medium text-foreground">Tính mạch lạc</h4>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Đảm bảo các chuyển tiếp mượt mà giữa các đoạn văn và ý tưởng.
+                      Bài luận của bạn nên tuân theo logic từ đầu đến cuối.
+                    </p>
+                  </div>
+                  <div className="bg-background p-4 rounded shadow-sm border border-border">
+                    <div className="flex items-center mb-3">
+                      <i className="fas fa-search text-green-500 text-xl mr-2"></i> {/* Keep specific accent colors */}
+                      <h4 className="font-medium text-foreground">Bằng chứng</h4>
+                    </div>
+                    <p className="text-muted-foreground text-sm">
+                      Hỗ trợ các tuyên bố bằng bằng chứng liên quan.
+                      Sử dụng hỗn hợp các ví dụ, số liệu thống kê và ý kiến chuyên gia để củng cố lập luận của bạn.
+                    </p>
+                  </div>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Part 2: Essay Content Sections with Dropdown and Side Notes (Giữ nguyên từ code cũ) */}
+          <section className="bg-card p-4 sm:p-6 rounded-xl shadow-xl border border-border">
+            <div className="bg-primary px-6 py-8 sm:px-8 flex flex-col md:flex-row justify-between items-start md:items-center rounded-t-lg -mx-6 -mt-6">
+              {/* Corrected H2 structure for consistency and proper text/icon color */}
+              <h2 className="text-primary-foreground mb-4 md:mb-0">  
+                <i className="fas fa-file-alt text-primary-foreground mr-2 text-3xl"></i> {/* Icon color directly set */}
+                <span className="text-2xl font-bold">Bài viết mẫu :</span><br />
+              </h2>
+              {/* This div wraps the dropdown and the hint text/arrow */}
+              {essay.canViewFullContent && essaySections.length > 0 && (
+                <div className="flex items-center space-x-3 text-primary-foreground text-sm relative w-full md:w-auto flex-shrink-0">
+                  {/* Hint text and arrow */}
+                  <span className="hidden md:inline-flex items-center text-sm font-medium mr-2">
+                    Click vào đây để chọn các bài mẫu khác
+                    <i className="fas fa-arrow-right ml-2 text-primary-foreground"></i>
+                  </span>
+                  {/* Essay Selector Dropdown */}
+                  <div className="relative w-full md:w-64">
+                    <select
+                      value={activeEssaySection}
+                      onChange={(e) => setActiveEssaySection(parseInt(e.target.value) as 1 | 2 | 3)}
+                      className="block w-full bg-primary-foreground/20 border border-primary-foreground/30 rounded-lg py-3 px-4 pr-10 text-primary-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-primary-foreground/50 cursor-pointer"
+                    >
+                      {essaySections.map((sec) => (
+                        <option key={sec.id} value={sec.id}>
+                          {sec.title}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-primary-foreground">
+                      <i className="fas fa-chevron-down"></i>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 sm:p-8">
+              {essay.canViewFullContent ? (
+                currentEssaySection ? (
+                  <div className="grid md:grid-cols-3 gap-8">
+                    <div className="md:col-span-2">
+                      <div className="pb-4">
+                        <div className="flex items-center mb-2">
+                          <div className="w-1 h-8 bg-primary mr-3"></div> {/* Accent color for marker */}
+                          <h3 className="text-xl font-bold text-foreground">
+                            {currentEssaySection.title}: {pageTitle}
+                          </h3>
+                        </div>
+                        {/* Audio Player for the selected Essay Section */}
+                        <div className="mb-6"> 
+                          <CustomAudioPlayer audioSrc={currentEssaySection.audio} initialDuration={270} variant="light" />
+                        </div>
+                        <div className="prose dark:prose-invert max-w-none text-muted-foreground text-justify " dangerouslySetInnerHTML={{ __html: currentEssaySection.content || '' }} /> {/* Sử dụng || '' để đảm bảo không null */}
+                        
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-1 space-y-6">
+                      <div className="bg-muted/30 p-5 rounded-lg border border-border">
+                        <h4 className="text-primary font-medium mb-3 flex items-center">
+                          <i className="fas fa-lightbulb text-primary mr-2"></i> {/* Consistent with primary color */}
+                          Điểm mạnh chính
+                        </h4>
+                        <ul className="text-sm text-muted-foreground space-y-2">
+                          <li className="flex items-start">
+                            <i className="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Luận điểm rõ ràng</span>
+                          </li>
+                          <li className="flex items-start">
+                            <i className="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Các đoạn văn có cấu trúc tốt</span>
+                          </li>
+                          <li className="flex items-start">
+                            <i className="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Bằng chứng hỗ trợ mạnh mẽ</span>
+                          </li>
+                          <li className="flex items-start">
+                            <i className="fas fa-check-circle text-green-500 mt-1 mr-2"></i>
+                            <span>Kết luận hiệu quả</span>
+                          </li>
+                        </ul>
+                      </div>
+
+                      <div className="bg-muted/30 p-5 rounded-lg border border-border">
+                        <h4 className="text-foreground font-medium mb-3 flex items-center">
+                          <i className="fas fa-search text-primary mr-2"></i> {/* Consistent with primary color */}
+                          Ghi chú phân tích
+                        </h4>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Bài luận này trình bày hiệu quả quan điểm cân bằng về chủ đề,
+                          xem xét nhiều khía cạnh trong khi vẫn giữ vững lập trường rõ ràng.
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Tác giả sử dụng nhiều loại bằng chứng và chuyển tiếp mượt mà giữa các ý tưởng,
+                          tạo ra một lập luận gắn kết.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-center text-muted-foreground">Không có nội dung cho phần bài luận này.</p>
+                )
               ) : (
+                // Limited access view for detailed essays (Giữ nguyên từ code cũ)
                 <div className="mt-10 p-6 border-2 border-dashed border-primary/50 rounded-lg text-center bg-card shadow-lg">
-                  <h2 className="text-2xl font-semibold text-primary mb-4">Nội dung giới hạn</h2>
-                  <div className="text-muted-foreground mb-6 leading-relaxed prose prose-invert max-w-none text-justify" dangerouslySetInnerHTML={{ __html: essay.previewContent || essay.message || "" }}/>
+                  <h2 className="text-2xl font-semibold text-primary mb-4">Nội dung bị giới hạn</h2>
+                  <p className="text-muted-foreground mb-6 leading-relaxed">
+                    Vui lòng Đăng nhập hoặc Đăng ký các gói truy cập để xem toàn bộ nội dung bài luận này.
+                  </p>
                   <div className="mt-4 space-y-3 sm:space-y-0 sm:space-x-4">
                     {!isAuthenticated ? (
                       <>
@@ -234,6 +576,7 @@ const SampleEssay: React.FC = () => {
                       </>
                     ) : (
                       <>
+                        {/* Only show subscribe buttons if not already full access */}
                         {essay.subscriptionStatus !== 'full_access' && essay.subscriptionStatus !== 'subscribed_specific' && (
                           <Button onClick={() => handleSubscribeEssay(essay._id)}>Đăng ký bài luận này</Button>
                         )}
@@ -245,13 +588,10 @@ const SampleEssay: React.FC = () => {
                   </div>
                 </div>
               )}
-            </article>
-            <div className="mt-12 pt-6 border-t border-border text-center">
-                <Button variant="link" asChild><Link to="/essays">&larr; Quay lại Thư viện</Link></Button>
             </div>
-          </div>
-        </div>
-      </section>
+          </section>
+        </main>
+      </div>
       <style>{` details[open] > summary .details-arrow { transform: rotate(90deg); } `}</style>
     </Layout>
   );

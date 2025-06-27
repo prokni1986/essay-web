@@ -1,38 +1,20 @@
-// src/components/AdminUploadExam.tsx
+// src/components/AdminUploadExam.tsx (Đã sửa lỗi ESLint no-explicit-any)
+
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
+import { toast } from 'sonner';
+
+// --- Import các thành phần cần thiết ---
+import axiosInstance from '@/lib/axiosInstance';
+import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
-import { Pencil, Trash2, XCircle, Loader2 } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Pencil, Trash2, XCircle, Loader2, ImageIcon } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// =================================================================================
-// CẤU HÌNH AXIOS VÀ INTERCEPTOR XÁC THỰC
-// =================================================================================
-const axiosInstance = axios.create({
-  // Sửa đổi: Sử dụng URL backend từ biến môi trường của Vite.
-  baseURL: import.meta.env.VITE_API_BASE_URL,
-});
-
-axiosInstance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// =================================================================================
-// CÁC ĐỊNH NGHĨA KIỂU DỮ LIỆU (TYPESCRIPT INTERFACES)
-// =================================================================================
-// Interface cho danh sách (không có htmlContent)
+// --- Định nghĩa kiểu dữ liệu (Interfaces) ---
 interface ExamInList {
   _id: string;
   title: string;
@@ -41,65 +23,65 @@ interface ExamInList {
   year: number;
   province?: string;
   createdAt: string;
+  thumbnailUrl?: string;
+  type?: 'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên';
+  duration?: number;
+  questions?: number;
+  difficulty?: 'Dễ' | 'Trung bình' | 'Khó' | 'Rất khó';
+  grade?: number;
 }
 
-// Interface cho đề thi đầy đủ (có htmlContent)
 interface ExamFull extends ExamInList {
-    htmlContent: string;
+  htmlContent: string;
+  solutionHtml?: string; // Lời giải có thể không có
 }
 
-
-// =================================================================================
-// COMPONENT CHÍNH: AdminUploadExam
-// =================================================================================
+// --- Component chính ---
 const AdminUploadExam: React.FC = () => {
-  // === STATE MANAGEMENT ===
-  const [exams, setExams] = useState<ExamInList[]>([]); // Chỉ lưu danh sách tóm tắt
+  // --- State Management ---
+  const [exams, setExams] = useState<ExamInList[]>([]);
   const [editingExam, setEditingExam] = useState<ExamFull | null>(null);
-
-  // State cho các trường trong form
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [subject, setSubject] = useState('');
   const [year, setYear] = useState<number | ''>(new Date().getFullYear());
   const [province, setProvince] = useState('');
   const [htmlContent, setHtmlContent] = useState('');
-  
-  // State cho các trạng thái giao diện
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<ExamInList | null>(null);
-
-  // State để lưu nội dung chi tiết đã được tải
-  const [fullContentCache, setFullContentCache] = useState<{ [key: string]: string }>({});
   const [loadingContentId, setLoadingContentId] = useState<string | null>(null);
+  
+  const [fullContentCache, setFullContentCache] = useState<{ [key: string]: { htmlContent: string; solutionHtml?: string } }>({});
+
+  // === Các state cho các trường mới ===
+  const [type, setType] = useState<'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên'>('Chính thức');
+  const [duration, setDuration] = useState<number | ''>('');
+  const [questions, setQuestions] = useState<number | ''>('');
+  const [difficulty, setDifficulty] = useState<'Dễ' | 'Trung bình' | 'Khó' | 'Rất khó'>('Trung bình');
+  const [grade, setGrade] = useState<number | ''>('');
+  
+  const [solutionHtml, setSolutionHtml] = useState('');
 
 
-  // === API FUNCTIONS ===
+  // --- API Functions ---
   const fetchExams = useCallback(async () => {
     setIsFetching(true);
     setApiError(null);
     try {
       const response = await axiosInstance.get('/api/exams');
-      
       if (Array.isArray(response.data)) {
         const sortedExams = response.data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
         setExams(sortedExams);
       } else {
-        throw new Error("Dữ liệu trả về từ server không phải là một mảng.");
+        throw new Error("Dữ liệu không hợp lệ từ server.");
       }
     } catch (error) {
-      let errorMessage = 'Không thể tải danh sách đề thi.';
-      if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
-          errorMessage = 'Lỗi xác thực: Bạn không có quyền truy cập hoặc phiên đăng nhập đã hết hạn.';
-      } else if (error instanceof Error) {
-        errorMessage = error.message; 
-      }
+      const errorMessage = 'Không thể tải danh sách đề thi.';
       setApiError(errorMessage);
       toast.error(errorMessage);
       console.error("Fetch exams error:", error);
-      setExams([]);
     } finally {
       setIsFetching(false);
     }
@@ -109,7 +91,7 @@ const AdminUploadExam: React.FC = () => {
     fetchExams();
   }, [fetchExams]);
 
-  // === FORM & CONTENT HANDLERS ===
+  // --- Form & Content Handlers ---
   const resetForm = () => {
     setTitle('');
     setDescription('');
@@ -117,64 +99,86 @@ const AdminUploadExam: React.FC = () => {
     setYear(new Date().getFullYear());
     setProvince('');
     setHtmlContent('');
+    setSolutionHtml('');
+    setType('Chính thức');
+    setDuration('');
+    setQuestions('');
+    setDifficulty('Trung bình');
+    setGrade('');
     setEditingExam(null);
   };
 
   const handleEditClick = async (exam: ExamInList) => {
     if (editingExam?._id === exam._id) {
-        resetForm();
-        return;
+      resetForm();
+      return;
     }
-    
-    // Tải nội dung đầy đủ để sửa
-    toast.info("Đang tải nội dung để chỉnh sửa...");
+    toast.info("Đang tải nội dung đề thi và lời giải...");
     try {
-        const response = await axiosInstance.get(`/api/exams/${exam._id}`);
-        const fullExamData: ExamFull = response.data;
-        
-        setEditingExam(fullExamData);
-        setTitle(fullExamData.title);
-        setDescription(fullExamData.description || '');
-        setSubject(fullExamData.subject);
-        setYear(fullExamData.year);
-        setProvince(fullExamData.province || '');
-        setHtmlContent(fullExamData.htmlContent);
-        
-        document.getElementById('exam-form-section')?.scrollIntoView({ behavior: 'smooth' });
+      const response = await axiosInstance.get(`/api/exams/${exam._id}`);
+      const fullExamData: ExamFull = response.data;
+      setEditingExam(fullExamData);
+      setTitle(fullExamData.title);
+      setDescription(fullExamData.description || '');
+      setSubject(fullExamData.subject);
+      setYear(fullExamData.year);
+      setProvince(fullExamData.province || '');
+      setHtmlContent(fullExamData.htmlContent);
+      setSolutionHtml(fullExamData.solutionHtml || '');
+      setType(fullExamData.type || 'Chính thức');
+      setDuration(fullExamData.duration || '');
+      setQuestions(fullExamData.questions || '');
+      setDifficulty(fullExamData.difficulty || 'Trung bình');
+      setGrade(fullExamData.grade || '');
+
+      document.getElementById('exam-form-section')?.scrollIntoView({ behavior: 'smooth' });
     } catch {
-        toast.error("Không thể tải nội dung chi tiết để sửa.");
+      toast.error("Không thể tải nội dung chi tiết để sửa.");
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !htmlContent || !subject || !year) {
-        toast.error("Vui lòng điền đầy đủ các trường bắt buộc.");
-        return;
+      toast.error("Vui lòng điền đủ các trường: Tiêu đề, Môn học, Năm và Nội dung HTML.");
+      return;
     }
-    setIsLoading(true);
 
-    const examData = { title, description, htmlContent, subject, year: Number(year), province };
+    setIsLoading(true);
+    toast.info("Đang xử lý... Quá trình tạo thumbnail có thể mất vài giây.");
+
+    const examData = {
+      title,
+      description,
+      htmlContent,
+      solutionHtml,
+      subject,
+      year: Number(year),
+      province,
+      type,
+      duration: Number(duration) || undefined,
+      questions: Number(questions) || undefined,
+      difficulty,
+      grade: Number(grade) || undefined,
+    };
 
     try {
-      if (editingExam) {
-        await axiosInstance.put(`/api/exams/${editingExam._id}`, examData);
-        toast.success('Cập nhật đề thi thành công!');
-      } else {
-        await axiosInstance.post('/api/exams/create-html-post', examData);
-        toast.success('Lưu đề thi thành công!');
-      }
+      const action = editingExam
+        ? axiosInstance.put(`/api/exams/${editingExam._id}`, examData)
+        : axiosInstance.post('/api/exams/create-html-post', examData);
+
+      await action;
+      toast.success(editingExam ? 'Cập nhật đề thi thành công!' : 'Tạo mới đề thi thành công!');
       resetForm();
-      fetchExams();
+      await fetchExams();
     } catch (error) {
-      toast.error('Thao tác thất bại.');
+      toast.error('Thao tác thất bại. Vui lòng kiểm tra lại dữ liệu.');
       console.error("Submit error:", error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // === DELETE HANDLER ===
   const handleDeleteConfirm = async () => {
     if (!deleteConfirm) return;
     setIsLoading(true);
@@ -182,24 +186,23 @@ const AdminUploadExam: React.FC = () => {
       await axiosInstance.delete(`/api/exams/${deleteConfirm._id}`);
       toast.success('Đã xóa đề thi thành công!');
       setDeleteConfirm(null);
-      fetchExams();
+      await fetchExams();
     } catch (error) {
       toast.error('Xóa đề thi thất bại.');
-      console.error("Delete error:", error);
     } finally {
       setIsLoading(false);
     }
   };
   
-  // === LAZY LOAD CONTENT FOR PREVIEW ===
-  const handleToggleDetails = async (examId: string, isOpen: boolean) => {
-    if (isOpen && !fullContentCache[examId] && !loadingContentId) {
+  const handleToggleDetails = async (examId: string) => {
+    if (!fullContentCache[examId] && !loadingContentId) {
       setLoadingContentId(examId);
       try {
         const response = await axiosInstance.get(`/api/exams/${examId}`);
-        if (response.data?.htmlContent) {
-          setFullContentCache(prev => ({ ...prev, [examId]: response.data.htmlContent }));
-        }
+        setFullContentCache(prev => ({ ...prev, [examId]: {
+          htmlContent: response.data.htmlContent,
+          solutionHtml: response.data.solutionHtml,
+        }}));
       } catch (error) {
         toast.error('Không thể tải nội dung xem trước.');
       } finally {
@@ -208,117 +211,230 @@ const AdminUploadExam: React.FC = () => {
     }
   };
 
+  const gradeOptions = Array.from({ length: 12 }, (_, i) => i + 1);
 
-  // === RENDER FUNCTION ===
+  // --- Render ---
   return (
-    <div className="p-4 md:p-8 text-white bg-gray-900 rounded-lg space-y-12">
-      <section id="exam-form-section">
-        <h1 className="text-3xl font-bold mb-4">{editingExam ? 'Chỉnh Sửa Đề Thi' : 'Tạo Đề Thi Mới'}</h1>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Form fields remain the same */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <Layout>
+      <main className="container mx-auto px-4 py-8 md:py-12">
+        <section id="exam-form-section" className="mb-16">
+          <header className="mb-8">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">
+              {editingExam ? 'Chỉnh Sửa Đề Thi' : 'Tạo Đề Thi Mới'}
+            </h1>
+            <p className="text-lg text-muted-foreground">
+              Điền thông tin, nội dung HTML của đề thi và lời giải vào biểu mẫu bên dưới.
+            </p>
+          </header>
+          <form onSubmit={handleSubmit} className="space-y-6 bg-card border p-6 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <Label htmlFor="title">Tiêu đề Đề thi (*)</Label>
-                <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required className="bg-gray-800 border-gray-600 mt-1" />
+                <Input id="title" value={title} onChange={(e) => setTitle(e.target.value)} required className="mt-1" />
               </div>
               <div>
-                <Label htmlFor="description">Mô tả ngắn (Tùy chọn)</Label>
-                <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="bg-gray-800 border-gray-600 mt-1" />
+                <Label htmlFor="description">Mô tả ngắn</Label>
+                <Input id="description" value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" />
               </div>
               <div>
                 <Label htmlFor="subject">Môn học (*)</Label>
-                <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} required className="bg-gray-800 border-gray-600 mt-1" />
+                <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} required className="mt-1" />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                  <div>
-                      <Label htmlFor="year">Năm (*)</Label>
-                      <Input id="year" type="number" value={year} onChange={(e) => setYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))} required className="bg-gray-800 border-gray-600 mt-1" />
-                  </div>
-                  <div>
-                      <Label htmlFor="province">Tỉnh/Thành phố (Tùy chọn)</Label>
-                      <Input id="province" value={province} onChange={(e) => setProvince(e.target.value)} className="bg-gray-800 border-gray-600 mt-1" />
-                  </div>
+                <div>
+                  <Label htmlFor="year">Năm (*)</Label>
+                  <Input id="year" type="number" value={year} onChange={(e) => setYear(e.target.value === '' ? '' : parseInt(e.target.value, 10))} required className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="province">Tỉnh/Thành phố</Label>
+                  <Input id="province" value={province} onChange={(e) => setProvince(e.target.value)} className="mt-1" />
+                </div>
               </div>
-          </div>
-          <div>
-            <Label htmlFor="htmlContent">Nội dung HTML đầy đủ (*)</Label>
-            <Textarea id="htmlContent" value={htmlContent} onChange={(e) => setHtmlContent(e.target.value)} required className="bg-gray-800 border-gray-600 h-96 font-mono mt-1" />
-          </div>
-          <div className="flex justify-end gap-4">
+
+              <div>
+                <Label htmlFor="type">Loại đề thi</Label>
+                {/* SỬA LỖI 1: Thay 'any' bằng union type cụ thể */}
+                <Select value={type} onValueChange={(value) => setType(value as 'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên')}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Chọn loại đề" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Chính thức">Chính thức</SelectItem>
+                    <SelectItem value="Thi thử">Thi thử</SelectItem>
+                    <SelectItem value="Đề ôn tập">Đề ôn tập</SelectItem>
+                    <SelectItem value="Đề thi chuyên">Đề thi chuyên</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="duration">Thời gian làm bài (phút)</Label>
+                <Input id="duration" type="number" value={duration} onChange={(e) => setDuration(e.target.value === '' ? '' : parseInt(e.target.value, 10))} className="mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="questions">Số câu hỏi</Label>
+                <Input id="questions" type="number" value={questions} onChange={(e) => setQuestions(e.target.value === '' ? '' : parseInt(e.target.value, 10))} className="mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="difficulty">Độ khó</Label>
+                {/* SỬA LỖI 2: Thay 'any' bằng union type cụ thể */}
+                <Select value={difficulty} onValueChange={(value) => setDifficulty(value as 'Dễ' | 'Trung bình' | 'Khó' | 'Rất khó')}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Chọn độ khó" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Dễ">Dễ</SelectItem>
+                    <SelectItem value="Trung bình">Trung bình</SelectItem>
+                    <SelectItem value="Khó">Khó</SelectItem>
+                    <SelectItem value="Rất khó">Rất khó</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="grade">Lớp</Label>
+                <Select value={grade !== '' ? String(grade) : ''} onValueChange={(value) => setGrade(value === '' ? '' : parseInt(value, 10))}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Chọn lớp" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {gradeOptions.map(g => (
+                      <SelectItem key={g} value={String(g)}>Lớp {g}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+                <div>
+                  <Label htmlFor="htmlContent">Nội dung Đề thi HTML (*)</Label>
+                  <Textarea id="htmlContent" value={htmlContent} onChange={(e) => setHtmlContent(e.target.value)} required className="h-96 font-mono mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="solutionHtml">Gợi ý lời giải HTML (Tùy chọn)</Label>
+                  <Textarea id="solutionHtml" value={solutionHtml} onChange={(e) => setSolutionHtml(e.target.value)} className="h-96 font-mono mt-1" />
+                </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
               {editingExam && (
-                <Button type="button" onClick={resetForm} variant="outline" className="text-white border-gray-500">Hủy</Button>
+                <Button type="button" onClick={resetForm} variant="outline">Hủy Chỉnh Sửa</Button>
               )}
-              <Button type="submit" disabled={isLoading} className="bg-yellow-500 hover:bg-yellow-600 text-gray-900">
-                {isLoading ? 'Đang xử lý...' : (editingExam ? 'Cập Nhật' : 'Tạo Mới')}
-              </Button>
-          </div>
-        </form>
-      </section>
-
-      <section>
-        <h2 className="text-3xl font-bold mb-6 border-t border-gray-700 pt-8">Quản Lý Đề Thi</h2>
-        {isFetching ? (
-          <p className="text-center">Đang tải danh sách...</p>
-        ) : apiError ? (
-          <div className="bg-red-900/50 border border-red-500 p-4 rounded-lg text-center">
-            <XCircle className="mx-auto h-8 w-8 text-red-400" />
-            <h4 className="font-bold mt-2">Lỗi Tải Dữ Liệu</h4>
-            <p className="text-sm text-red-200 mt-1">{apiError}</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {exams.length > 0 ? exams.map(exam => (
-              <details key={exam._id} className="bg-gray-800 rounded-lg border border-gray-700" onToggle={(e) => handleToggleDetails(exam._id, (e.target as HTMLDetailsElement).open)}>
-                  <summary className="p-4 flex justify-between items-center cursor-pointer list-none hover:bg-gray-700/50">
-                      <div>
-                          <h3 className="font-semibold">{exam.title}</h3>
-                          <p className="text-sm text-gray-400">{exam.subject} ({exam.year})</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEditClick(exam); }} aria-label="Sửa">
-                              <Pencil className="h-4 w-4 text-blue-400" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(exam); }} aria-label="Xóa">
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
-                      </div>
-                  </summary>
-                  <div className="p-4 border-t border-gray-700">
-                      <h4 className="font-semibold mb-2">Xem trước:</h4>
-                      {loadingContentId === exam._id ? (
-                        <div className="w-full h-96 flex items-center justify-center bg-gray-700 rounded">
-                           <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                        </div>
-                      ) : (
-                         <iframe 
-                            srcDoc={fullContentCache[exam._id] || "<p style='padding:1rem; color:#555;'>Mở rộng để tải nội dung xem trước.</p>"} 
-                            title={`Preview of ${exam.title}`}
-                            className="w-full h-96 rounded bg-white"
-                            sandbox=""
-                          />
-                      )}
-                  </div>
-              </details>
-            )) : <p className="text-center text-gray-500 py-8">Chưa có đề thi nào.</p>}
-          </div>
-        )}
-      </section>
-
-      {deleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 shadow-xl w-full max-w-sm">
-            <h3 className="text-lg font-bold">Xác nhận xóa</h3>
-            <p className="my-4">Bạn có chắc muốn xóa đề thi: "{deleteConfirm.title}"?</p>
-            <div className="mt-6 flex justify-end gap-4">
-              <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Hủy</Button>
-              <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isLoading}>
-                {isLoading ? 'Đang xóa...' : 'Xóa'}
+              <Button type="submit" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isLoading ? 'Đang xử lý...' : (editingExam ? 'Cập Nhật Đề Thi' : 'Tạo Mới')}
               </Button>
             </div>
+          </form>
+        </section>
+
+        <section>
+          <header className="mb-6">
+             <h2 className="text-3xl font-bold tracking-tight text-foreground">Danh Sách Đề Thi</h2>
+          </header>
+          {isFetching ? (
+            <div className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></div>
+          ) : apiError ? (
+            <div className="bg-destructive/10 border border-destructive/50 p-4 rounded-lg text-center">
+              <XCircle className="mx-auto h-8 w-8 text-destructive" />
+              <h4 className="font-bold mt-2">Lỗi Tải Dữ Liệu</h4>
+              <p className="text-sm text-destructive/80 mt-1">{apiError}</p>
+            </div>
+           ) : (
+            <Accordion type="single" collapsible className="w-full space-y-2">
+              {exams.length > 0 ? exams.map(exam => {
+                  const cachedContent = fullContentCache[exam._id];
+                  return (
+                    <AccordionItem key={exam._id} value={exam._id} className="bg-card border rounded-lg" onClick={() => handleToggleDetails(exam._id)}>
+                      <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50 rounded-t-lg data-[state=open]:rounded-b-none">
+                        <div className="flex flex-col md:flex-row items-start md:items-center flex-1 text-left">
+                          {exam.thumbnailUrl ? (
+                            <img
+                              src={exam.thumbnailUrl}
+                              alt={`Thumbnail for ${exam.title}`}
+                              className="w-24 h-auto object-cover rounded-md mr-4 mb-2 md:mb-0"
+                              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder.png'; }}
+                            />
+                          ) : (
+                            <div className="w-24 h-auto flex items-center justify-center bg-muted rounded-md mr-4 mb-2 md:mb-0">
+                                <ImageIcon className="h-10 w-10 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div>
+                            <h3 className="font-semibold text-foreground text-lg">{exam.title}</h3>
+                            <p className="text-sm text-muted-foreground">
+                                {exam.subject} ({exam.year}) - {exam.province || 'Không rõ'}
+                                {exam.type && ` - ${exam.type}`}
+                                {exam.grade && ` - Lớp ${exam.grade}`}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Ngày tạo: {new Date(exam.createdAt).toLocaleDateString('vi-VN')}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 pl-4">
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleEditClick(exam); }}>
+                            <Pencil className="h-4 w-4 text-primary" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); setDeleteConfirm(exam); }}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="p-4 border-t">
+                        {loadingContentId === exam._id ? (
+                          <div className="w-full h-96 flex items-center justify-center bg-muted rounded-md">
+                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                          </div>
+                        ) : cachedContent ? (
+                            <div>
+                                <h4 className="font-semibold mb-2 text-muted-foreground">Xem trước nội dung đề thi:</h4>
+                                <iframe 
+                                    srcDoc={cachedContent.htmlContent || ""} 
+                                    title={`Preview of ${exam.title}`}
+                                    className="w-full h-[70vh] rounded-md bg-white border mb-4"
+                                    sandbox="allow-scripts"
+                                />
+                                {cachedContent.solutionHtml && (
+                                    <>
+                                        <h4 className="font-semibold mb-2 text-muted-foreground">Xem trước lời giải:</h4>
+                                        <iframe 
+                                            srcDoc={cachedContent.solutionHtml} 
+                                            title={`Solution Preview for ${exam.title}`}
+                                            className="w-full h-[70vh] rounded-md bg-white border"
+                                            sandbox="allow-scripts"
+                                        />
+                                    </>
+                                )}
+                            </div>
+                        ) : (
+                            <p style={{padding:'1rem'}}>Nhấn vào để tải nội dung xem trước.</p>
+                        )}
+                      </AccordionContent>
+                    </AccordionItem>
+                  )
+                }) : <p className="text-center text-muted-foreground py-8">Chưa có đề thi nào.</p>}
+            </Accordion>
+           )}
+        </section>
+
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+            <div className="bg-card border rounded-lg p-6 shadow-lg w-full max-w-sm m-4">
+              <h3 className="text-lg font-semibold text-foreground">Xác nhận xóa</h3>
+              <p className="my-2 text-sm text-muted-foreground">Bạn có chắc muốn xóa vĩnh viễn đề thi này không?</p>
+              <p className="my-4 font-semibold text-primary">"{deleteConfirm.title}"</p>
+              <div className="mt-6 flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setDeleteConfirm(null)}>Hủy</Button>
+                <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {isLoading ? 'Đang xóa...' : 'Xóa Vĩnh Viễn'}
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </main>
+    </Layout>
   );
 };
 

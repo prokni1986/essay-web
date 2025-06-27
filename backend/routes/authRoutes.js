@@ -4,6 +4,7 @@ import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import authenticateToken from '../config/authMiddleware.js'; // Đảm bảo đường dẫn này chính xác
+// import authController from '../controllers/authController.js'; // Không cần nếu bạn nhúng logic trực tiếp như hiện tại
 
 const router = express.Router();
 
@@ -44,6 +45,8 @@ router.post('/register', async (req, res) => {
       username,
       email,
       password,
+      // 'role' sẽ được tự động gán là 'user' từ User Model nếu không được cung cấp ở đây.
+      // Nếu bạn muốn cho phép đăng ký admin qua API, bạn cần thêm logic kiểm tra ở đây.
     });
 
     await newUser.save();
@@ -51,7 +54,7 @@ router.post('/register', async (req, res) => {
 
   } catch (err) {
     console.error("Register error:", err);
-    if (err.code === 11000) {
+    if (err.code === 11000) { // Duplicate key error for unique fields
         const field = Object.keys(err.keyValue)[0];
         errors.push({ msg: `Giá trị '${err.keyValue[field]}' cho trường '${field}' đã tồn tại.` });
         return res.status(400).json({ errors });
@@ -62,27 +65,38 @@ router.post('/register', async (req, res) => {
 
 // 2. Đăng nhập
 router.post('/login', (req, res, next) => {
+  // Passport.authenticate gọi chiến lược 'local' (được định nghĩa trong passportConfig.js)
+  // { session: false } vì chúng ta dùng JWT, không dùng session dựa trên cookie
   passport.authenticate('local', { session: false }, (err, user, info) => {
+    // Xử lý lỗi từ Passport.js hoặc LocalStrategy
     if (err) {
       console.error("Login passport authenticate error:", err);
-      return next(err); // Nên để Express xử lý lỗi này
+      return next(err); // Chuyển lỗi tới middleware xử lý lỗi của Express
     }
+    // Nếu người dùng không được tìm thấy hoặc mật khẩu không đúng
     if (!user) {
       return res.status(401).json({ message: info ? info.message : 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.' });
     }
+
+    // Nếu xác thực thành công, tạo payload cho JWT
     const payload = {
       id: user.id,
       username: user.username,
       email: user.email,
-      // roles: user.roles // nếu có
+      role: user.role, // <-- QUAN TRỌNG: Bao gồm vai trò người dùng trong payload của JWT
+                      // Điều này đảm bảo vai trò có thể được giải mã từ token sau này
     };
+
     // Đảm bảo JWT_SECRET đã được định nghĩa trong biến môi trường
     if (!process.env.JWT_SECRET) {
-        console.error("Lỗi nghiêm trọng: JWT_SECRET chưa được định nghĩa!");
-        return res.status(500).json({ message: "Lỗi cấu hình máy chủ." });
+        console.error("Lỗi nghiêm trọng: JWT_SECRET chưa được định nghĩa trong .env!");
+        return res.status(500).json({ message: "Lỗi cấu hình máy chủ: JWT_SECRET bị thiếu." });
     }
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1d' });
 
+    // Ký (sign) JWT
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1d' }); // Token hết hạn sau 1 ngày
+
+    // Trả về response thành công
     res.json({
       message: 'Đăng nhập thành công!',
       token: `Bearer ${token}`, // Gửi token về client với tiền tố Bearer
@@ -90,10 +104,11 @@ router.post('/login', (req, res, next) => {
         id: user.id,
         username: user.username,
         email: user.email,
-        // roles: user.roles
+        role: user.role, // <-- QUAN TRỌNG: Bao gồm vai trò người dùng trong object user trả về
+                       // Đây là dữ liệu mà AuthProvider ở frontend sẽ nhận trực tiếp
       }
     });
-  })(req, res, next);
+  })(req, res, next); // Đảm bảo passport.authenticate được gọi với req, res, next
 });
 
 
@@ -103,10 +118,26 @@ router.post('/login', (req, res, next) => {
 router.get('/me', authenticateToken, async (req, res) => {
   // Middleware `authenticateToken` đã chạy trước:
   // - Nếu token không hợp lệ hoặc thiếu, nó đã trả về lỗi 401 hoặc 403.
-  // - Nếu token hợp lệ, nó đã tìm user, loại bỏ password và gán vào `req.user`.
+  // - Nếu token hợp lệ, nó đã tìm user (không bao gồm mật khẩu) và gán vào `req.user`.
 
   // Do đó, nếu request đến được đây, `req.user` chắc chắn tồn tại và hợp lệ.
-  res.status(200).json({ user: req.user });
+  // req.user sẽ chứa các thuộc tính từ database, bao gồm 'role' nếu nó có trong DB.
+  console.log("Fetching user profile in authRoutes /me:", req.user); // Log để debug
+
+  // Kiểm tra req.user để tránh lỗi nếu có trường hợp nào đó req.user bị null (mặc dù authenticateToken đã xử lý)
+  if (req.user) {
+    res.status(200).json({
+      user: { // Chỉ trả về các trường cần thiết, tránh gửi toàn bộ object mongoose document
+        id: req.user.id,
+        username: req.user.username,
+        email: req.user.email,
+        role: req.user.role, // <-- QUAN TRỌNG: Đảm bảo trả về vai trò ở đây
+      }
+    });
+  } else {
+    // Trường hợp này hiếm khi xảy ra nếu authenticateToken hoạt động đúng
+    res.status(404).json({ message: 'Người dùng không tìm thấy.' });
+  }
 });
 
 export default router;

@@ -1,0 +1,84 @@
+/* File: src/pages/NewsDetailPage.css */
+
+.news-detail-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 1rem;
+    background-color: #fff;
+  }
+  
+  .news-article {
+    line-height: 1.7;
+  }
+  
+  .article-banner {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: cover;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+  }
+  
+  .article-header {
+    margin-bottom: 2rem;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 1.5rem;
+  }
+  
+  .article-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #111827;
+    margin-bottom: 1rem;
+  }
+  
+  .article-meta {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.9rem;
+    color: #6b7280;
+  }
+  
+  .article-content {
+    color: #374151;
+  }
+  
+  /* Căn bản cho nội dung từ Rich Text Editor */
+  .prose h1, .prose h2, .prose h3 {
+    font-weight: 600;
+    color: #111827;
+    margin-top: 1.5em;
+    margin-bottom: 0.8em;
+  }
+  
+  .prose p {
+    margin-bottom: 1.25em;
+  }
+  
+  .prose a {
+    color: #3b82f6;
+    text-decoration: underline;
+  }
+  
+  .prose a:hover {
+    color: #1d4ed8;
+  }
+  
+  .prose ul, .prose ol {
+    padding-left: 1.5em;
+    margin-bottom: 1.25em;
+  }
+  
+  /* Trạng thái Loading / Lỗi */
+  .detail-status-message {
+    text-align: center;
+    font-size: 1.2rem;
+    padding: 4rem;
+    color: #6b7280;
+  }
+  
+  .detail-status-message.error {
+    color: #ef4444;
+  }

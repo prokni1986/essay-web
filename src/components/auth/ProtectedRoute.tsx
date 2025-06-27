@@ -1,7 +1,7 @@
 // src/components/auth/ProtectedRoute.tsx
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext'; // Đường dẫn tới AuthContext
+import { useAuth } from '@/hooks/useAuth';
 
 const ProtectedRoute: React.FC = () => {
   const { isAuthenticated, isLoading } = useAuth();

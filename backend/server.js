@@ -12,12 +12,19 @@ import topicRoutes from './routes/topicRoutes.js';
 import categoryRoutes from './routes/categoryRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import subscriptionRoutes from './routes/subscriptionRoutes.js';
-import adminRoutes from './routes/adminRoutes.js'; // THÊM MỚI
+import adminRoutes from './routes/adminRoutes.js';
 import { v2 as cloudinary } from 'cloudinary';
-import examRoutes from './routes/examRoutes.js'; // <<<< Bằng dòng này
-import newsRoutes from './routes/newsRoutes.js'
+import examRoutes from './routes/examRoutes.js';
+import newsRoutes from './routes/newsRoutes.js';
 import tagRoutes from './routes/tagRoutes.js';
 import noticeRoutes from './routes/noticeRoutes.js';
+import interactiveExamRoutes from './routes/interactiveExamRoutes.js';
+import adminInteractiveExamRoutes from './routes/adminInteractiveExamRoutes.js';
+
+// NEW IMPORTS FOR LECTURES SYSTEM
+import lectureCategoryRoutes from './routes/lectureCategoryRoutes.js';
+import lectureRoutes from './routes/lectureRoutes.js';
+
 dotenv.config();
 
 const app = express();
@@ -38,22 +45,18 @@ if (process.env.CLOUDINARY_URL || (process.env.CLOUDINARY_CLOUD_NAME && process.
 
 // Cấu hình CORS
 const allowedOrigins = [
-  process.env.FRONTEND_URL_VERCEL, // <<<< Biến môi trường cho URL Vercel của bạn
-  process.env.FRONTEND_URL_LOCAL || 'http://localhost:8080', // Hoặc port local dev của bạn (ví dụ 3000, 8080)
+  process.env.FRONTEND_URL_VERCEL,
+  process.env.FRONTEND_URL_LOCAL || 'http://localhost:8080',
   'https://essay-web-1.onrender.com',
   'https://essay-web-neon.vercel.app',
   
-].filter(Boolean); // Loại bỏ các giá trị undefined/null
+].filter(Boolean);
 
-console.log("Allowed Origins for CORS:", allowedOrigins); // Log ra để kiểm tra
+console.log("Allowed Origins for CORS:", allowedOrigins);
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Nếu không có origin (ví dụ: Postman trong một số trường hợp, hoặc server-to-server)
-    // hoặc nếu origin nằm trong danh sách cho phép.
-    // Trong production, bạn có thể muốn chặt chẽ hơn với việc !origin
     if (!origin || allowedOrigins.includes(origin)) {
-      // console.log(`Allowing origin: ${origin}`); // Bật log này nếu cần debug kỹ
       callback(null, true);
     } else {
       console.error(`Blocked by CORS. Origin: ${origin}. Allowed origins:`, allowedOrigins);
@@ -86,11 +89,18 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/essays', essayRoutes);
 app.use('/api/topics', topicRoutes);
 app.use('/api/categories', categoryRoutes);
-app.use('/api/admin', adminRoutes); // <<<< THÊM MỚI
+app.use('/api/admin', adminRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/notices', noticeRoutes);
+app.use('/api/interactive-exams', interactiveExamRoutes);
+app.use('/api/admin/interactive-exams', adminInteractiveExamRoutes);
+
+// NEW ROUTES FOR LECTURES SYSTEM
+app.use('/api/lecturecategories', lectureCategoryRoutes);
+app.use('/api/lectures', lectureRoutes);
+
 // Route cơ bản để kiểm tra server
 app.get('/', (req, res) => {
   res.send('Essay Web API is running with Authentication! 🚀');

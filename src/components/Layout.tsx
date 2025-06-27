@@ -1,24 +1,27 @@
+// src/components/Layout.tsx (Đã sửa)
+
 import React from 'react';
 import Header from './Header';
 import Footer from './Footer';
-// MỚI: Import ThemeProvider từ file bạn đã tạo
-import { ThemeProvider } from './theme-provider'; // <-- Sửa đường dẫn nếu cần
+import { ThemeProvider } from './theme-provider';
 
 interface LayoutProps {
   children: React.ReactNode;
   className?: string;
 }
 
-const Layout = ({ children, className }: LayoutProps) => {
+const Layout: React.FC<LayoutProps> = ({ children, className }) => {
   return (
-    // MỚI: Bao bọc toàn bộ nội dung của Layout bằng ThemeProvider
-    // Điều này cung cấp "context" về theme cho Header, Footer, và children
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <div className={`min-h-screen flex flex-col ${className || ''}`}>
+      <div className={`min-h-screen flex flex-col bg-background ${className || ''}`}>
         <Header />
-        <main className="flex-grow pt-24">
+        
+        {/* Đã xóa pt-24. Thêm class container ở đây nếu bạn muốn TẤT CẢ các trang đều có nội dung co vào giữa */}
+        {/* Tuy nhiên, để linh hoạt, tốt hơn là đặt container trong từng trang riêng lẻ */}
+        <main className="flex-grow">
           {children}
         </main>
+
         <Footer />
       </div>
     </ThemeProvider>

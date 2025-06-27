@@ -1,7 +1,7 @@
 // file: src/components/AdminCategories.tsx
-import React, { useEffect, useState, ChangeEvent, FormEvent } from 'react';
-import axios, { AxiosError } from 'axios'; // Still needed for axios.isAxiosError and AxiosError type
-import axiosInstance from '../lib/axiosInstance'; // Corrected path
+import React, { useEffect, useState, ChangeEvent, FormEvent, useCallback } from 'react';
+import axios, { AxiosError } from 'axios';
+import axiosInstance from '../lib/axiosInstance';
 
 type Category = {
   _id: string;
@@ -11,7 +11,7 @@ type Category = {
 
 interface ApiErrorResponse {
   error: string;
-  hasTopics?: boolean; // For delete error
+  hasTopics?: boolean;
 }
 
 const CATEGORIES_PER_PAGE = 6;
@@ -26,30 +26,37 @@ const AdminCategories: React.FC = () => {
   const [editingDescription, setEditingDescription] = useState<string>('');
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [message, setMessage] = useState<string>(''); // General messages
-  const [errorMessage, setErrorMessage] = useState<string>(''); // Error messages
+  const [message, setMessage] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string>('');
 
   const [currentPage, setCurrentPage] = useState<number>(1);
 
   const CATEGORIES_API_PATH = '/api/categories';
 
-  const fetchCategories = async () => {
+  const fetchCategories = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await axiosInstance.get<Category[]>(CATEGORIES_API_PATH);
-      setCategories(Array.isArray(res.data) ? res.data : []);
-      setCurrentPage(1);
+      const fetchedCategories = Array.isArray(res.data) ? res.data : [];
+      setCategories(fetchedCategories);
+
+      // Adjust current page if the last item on it was deleted
+      const totalPages = Math.ceil(fetchedCategories.length / CATEGORIES_PER_PAGE);
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(totalPages);
+      }
+
     } catch (err) {
       console.error("Lỗi khi tải danh sách chuyên mục:", err);
       setErrorMessage("Không thể tải danh sách chuyên mục.");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [currentPage]);
 
   useEffect(() => {
     fetchCategories();
-  }, []);
+  }, [fetchCategories]);
 
   const resetAddForm = () => {
     setNewCategoryName('');
@@ -74,7 +81,8 @@ const AdminCategories: React.FC = () => {
       });
       setMessage('Thêm chuyên mục thành công!');
       resetAddForm();
-      fetchCategories();
+      setCurrentPage(1); 
+      await fetchCategories();
     } catch (error) {
       console.error("Lỗi khi thêm chuyên mục:", error);
       let errMsg = 'Lỗi không xác định khi thêm chuyên mục.';
@@ -88,6 +96,7 @@ const AdminCategories: React.FC = () => {
       setIsLoading(false);
       setTimeout(() => {
         setMessage('');
+        setErrorMessage('');
       }, 3000);
     }
   };
@@ -98,6 +107,8 @@ const AdminCategories: React.FC = () => {
     setEditingDescription(category.description || '');
     setMessage('');
     setErrorMessage('');
+    const formElement = document.getElementById('edit-category-form');
+    if (formElement) formElement.scrollIntoView({ behavior: 'smooth' });
   };
 
   const cancelEdit = () => {
@@ -105,8 +116,6 @@ const AdminCategories: React.FC = () => {
     setEditingName('');
     setEditingDescription('');
     setIsLoading(false);
-    setMessage('');
-    setErrorMessage('');
   };
 
   const handleEditCategory = async (e: FormEvent) => {
@@ -126,7 +135,7 @@ const AdminCategories: React.FC = () => {
         description: editingDescription.trim(),
       });
       setMessage('Cập nhật chuyên mục thành công!');
-      fetchCategories();
+      await fetchCategories();
       setTimeout(() => { cancelEdit(); }, 1500);
     } catch (error) {
       console.error("Lỗi khi sửa chuyên mục:", error);
@@ -137,7 +146,12 @@ const AdminCategories: React.FC = () => {
       } else if (error instanceof Error) { errMsg = error.message; }
       setErrorMessage(`Lỗi: ${errMsg}`);
       setMessage('');
-      setIsLoading(false);
+       setIsLoading(false);
+    } finally {
+       setTimeout(() => {
+        setMessage('');
+        setErrorMessage('');
+      }, 3000);
     }
   };
 
@@ -152,8 +166,8 @@ const AdminCategories: React.FC = () => {
     try {
       await axiosInstance.delete(`${CATEGORIES_API_PATH}/${id}`);
       setMessage(`Chuyên mục "${categoryToDelete?.name || id}" đã được xóa.`);
-      fetchCategories();
       if (editingId === id) cancelEdit();
+      await fetchCategories();
     } catch (error) {
       console.error("Lỗi khi xóa chuyên mục:", error);
       let errMsg = 'Lỗi không xác định khi xóa chuyên mục.';
@@ -170,17 +184,18 @@ const AdminCategories: React.FC = () => {
       setIsLoading(false);
       setTimeout(() => {
           setMessage('');
+          setErrorMessage('');
       }, 5000);
     }
   };
-
+    
   const indexOfLastCategory = currentPage * CATEGORIES_PER_PAGE;
   const indexOfFirstCategory = indexOfLastCategory - CATEGORIES_PER_PAGE;
   const currentCategories = categories.slice(indexOfFirstCategory, indexOfLastCategory);
   const totalPages = Math.ceil(categories.length / CATEGORIES_PER_PAGE);
 
   const paginate = (pageNumber: number) => {
-    if (pageNumber > 0 && pageNumber <= totalPages) {
+    if (pageNumber > 0 && pageNumber <= totalPages && pageNumber !== currentPage) {
       setCurrentPage(pageNumber);
     }
   };
@@ -188,60 +203,49 @@ const AdminCategories: React.FC = () => {
   const renderPageNumbers = () => {
     const pageNumbers = [];
     if (totalPages <= 1) return null;
-    const maxPageButtons = 3;
-    let startPage: number, endPage: number;
-
-    if (totalPages <= maxPageButtons) { startPage = 1; endPage = totalPages; }
-    else {
-      const maxPagesBeforeCurrentPage = Math.floor(maxPageButtons / 2);
-      const maxPagesAfterCurrentPage = Math.ceil(maxPageButtons / 2) - 1;
-      if (currentPage <= maxPagesBeforeCurrentPage) { startPage = 1; endPage = maxPageButtons; }
-      else if (currentPage + maxPagesAfterCurrentPage >= totalPages) { startPage = totalPages - maxPageButtons + 1; endPage = totalPages; }
-      else { startPage = currentPage - maxPagesBeforeCurrentPage; endPage = currentPage + maxPagesAfterCurrentPage; }
+    for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(
+            <button key={i} onClick={() => paginate(i)} disabled={i === currentPage} className={`py-2 px-4 border rounded-md text-sm disabled:opacity-100 ${i === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'}`}>
+                {i}
+            </button>
+        );
     }
-    if (startPage > 1) pageNumbers.push(<button key={1} onClick={() => paginate(1)} className="mx-1 px-3 py-1 border rounded text-sm bg-white text-blue-500 hover:bg-blue-100">1</button>);
-    if (startPage > 2) pageNumbers.push(<span key="start-ellipsis" className="mx-1 px-2 py-1">...</span>);
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(<button key={i} onClick={() => paginate(i)} className={`mx-1 px-3 py-1 border rounded text-sm ${currentPage === i ? 'bg-blue-500 text-white' : 'bg-white text-blue-500 hover:bg-blue-100'}`}>{i}</button>);
-    }
-    if (endPage < totalPages) pageNumbers.push(<span key="end-ellipsis" className="mx-1 px-2 py-1">...</span>);
-    if (endPage < totalPages) pageNumbers.push(<button key={totalPages} onClick={() => paginate(totalPages)} className="mx-1 px-3 py-1 border rounded text-sm bg-white text-blue-500 hover:bg-blue-100">{totalPages}</button>);
     return pageNumbers;
   };
-
+  
   return (
-    <div className="p-4 sm:p-6 max-w-4xl mx-auto bg-gray-50 min-h-screen">
-      <h1 className="text-2xl sm:text-3xl font-semibold mb-6 sm:mb-8 text-center text-gray-800">Quản lý Chuyên mục (Categories)</h1>
+    <div className="p-4 sm:p-6 max-w-4xl mx-auto bg-slate-50 min-h-screen font-sans">
+      <h1 className="text-3xl font-bold mb-8 text-center text-slate-800">Quản lý Chuyên mục</h1>
 
-      {message && <div className="mb-4 p-3 rounded bg-green-100 text-green-700 border border-green-300">{message}</div>}
-      {errorMessage && <div className="mb-4 p-3 rounded bg-red-100 text-red-700 border border-red-300">{errorMessage}</div>}
+      {message && <div className="mb-4 p-3 rounded-lg bg-green-100 text-green-800 border border-green-300 text-center">{message}</div>}
+      {errorMessage && <div className="mb-4 p-3 rounded-lg bg-red-100 text-red-800 border border-red-300 text-center">{errorMessage}</div>}
 
       {!editingId && (
-        <form onSubmit={handleAddCategory} className="mb-8 sm:mb-10 p-5 sm:p-6 bg-white shadow-xl rounded-lg">
-          <h2 className="text-xl sm:text-2xl font-medium mb-5 sm:mb-6 text-gray-700">Thêm Chuyên mục mới</h2>
+        <form onSubmit={handleAddCategory} className="mb-10 p-6 bg-white shadow-lg rounded-lg border border-slate-200">
+          <h2 className="text-2xl font-semibold mb-6 text-slate-700">Thêm Chuyên mục mới</h2>
           <div className="mb-4">
-            <label htmlFor="newCategoryName" className="block text-sm font-medium text-gray-600 mb-1">Tên Chuyên mục:<span className="text-red-500">*</span></label>
+            <label htmlFor="newCategoryName" className="block text-sm font-medium text-slate-600 mb-1">Tên Chuyên mục:<span className="text-red-500">*</span></label>
             <input
               id="newCategoryName" type="text" value={newCategoryName}
               onChange={(e) => setNewCategoryName(e.target.value)}
               placeholder="VD: Nghị luận xã hội"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900"
               disabled={isLoading} required
             />
           </div>
           <div className="mb-6">
-            <label htmlFor="newCategoryDescription" className="block text-sm font-medium text-gray-600 mb-1">Mô tả (tùy chọn):</label>
+            <label htmlFor="newCategoryDescription" className="block text-sm font-medium text-slate-600 mb-1">Mô tả (tùy chọn):</label>
             <textarea
               id="newCategoryDescription" value={newCategoryDescription}
               onChange={(e) => setNewCategoryDescription(e.target.value)}
               placeholder="Mô tả ngắn về chuyên mục này"
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-slate-900"
               disabled={isLoading}
             />
           </div>
           <button type="submit" disabled={isLoading}
-            className="w-full font-medium py-2.5 px-5 rounded-lg text-white transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 bg-blue-500 hover:bg-blue-600 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed"
+            className="w-full font-semibold py-2.5 px-5 rounded-lg text-white transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500 disabled:bg-indigo-300 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Đang xử lý...' : 'Thêm Chuyên mục'}
           </button>
@@ -249,35 +253,35 @@ const AdminCategories: React.FC = () => {
       )}
 
       {editingId && (
-        <form onSubmit={handleEditCategory} className="mb-8 sm:mb-10 p-5 sm:p-6 bg-white shadow-xl rounded-lg border-2 border-yellow-400">
-          <h2 className="text-xl sm:text-2xl font-medium mb-5 text-gray-700">Chỉnh sửa Chuyên mục: <span className="font-bold">{editingName}</span></h2>
+        <form id="edit-category-form" onSubmit={handleEditCategory} className="mb-10 p-6 bg-white shadow-lg rounded-lg border-2 border-amber-400">
+          <h2 className="text-2xl font-semibold mb-6 text-slate-700">Chỉnh sửa Chuyên mục</h2>
           <div className="mb-4">
-            <label htmlFor="editingName" className="block text-sm font-medium text-gray-600 mb-1">Tên Chuyên mục:<span className="text-red-500">*</span></label>
+            <label htmlFor="editingName" className="block text-sm font-medium text-slate-600 mb-1">Tên Chuyên mục:<span className="text-red-500">*</span></label>
             <input
               id="editingName" type="text" value={editingName}
               onChange={(e) => setEditingName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-gray-900"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-900"
               disabled={isLoading} required
             />
           </div>
           <div className="mb-6">
-            <label htmlFor="editingDescription" className="block text-sm font-medium text-gray-600 mb-1">Mô tả (tùy chọn):</label>
+            <label htmlFor="editingDescription" className="block text-sm font-medium text-slate-600 mb-1">Mô tả (tùy chọn):</label>
             <textarea
               id="editingDescription" value={editingDescription}
               onChange={(e) => setEditingDescription(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 text-gray-900"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-slate-900"
               disabled={isLoading}
             />
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
             <button type="submit" disabled={isLoading}
-              className="flex-1 font-medium py-2.5 px-5 rounded-lg text-white transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 bg-green-500 hover:bg-green-600 focus:ring-green-500 disabled:bg-green-300 disabled:cursor-not-allowed"
+              className="flex-1 font-semibold py-2.5 px-5 rounded-lg text-white transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 bg-amber-500 hover:bg-amber-600 focus:ring-amber-500 disabled:bg-amber-300 disabled:cursor-not-allowed"
             >
               {isLoading ? 'Đang lưu...' : 'Lưu Thay đổi'}
             </button>
             <button type="button" onClick={cancelEdit} disabled={isLoading}
-              className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-medium py-2.5 px-5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:opacity-50"
+              className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold py-2.5 px-5 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 disabled:opacity-50"
             >
               Hủy
             </button>
@@ -286,30 +290,33 @@ const AdminCategories: React.FC = () => {
       )}
 
       <div>
-        <h2 className="text-xl sm:text-2xl font-medium mb-5 text-gray-700">Danh sách Chuyên mục ({categories.length})</h2>
-        {isLoading && categories.length === 0 && <p className="text-gray-500">Đang tải chuyên mục...</p>}
+        <h2 className="text-2xl font-semibold mb-5 text-slate-700">Danh sách Chuyên mục ({categories.length})</h2>
+        {isLoading && categories.length === 0 && <p className="text-slate-500 text-center py-4">Đang tải chuyên mục...</p>}
         {!isLoading && categories.length === 0 && !editingId && (
-          <p className="text-gray-500 text-center py-4 bg-white rounded-md shadow">Không có chuyên mục nào. Hãy thêm một chuyên mục mới.</p>
+          <div className="text-center py-10 bg-white rounded-lg shadow-md border border-slate-200">
+             <p className="text-slate-500">Không có chuyên mục nào.</p>
+             <p className="text-slate-400 text-sm mt-1">Hãy bắt đầu bằng việc thêm một chuyên mục mới ở trên.</p>
+          </div>
         )}
         {currentCategories.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {currentCategories.map((category) => (
-              <div key={category._id} className="p-4 bg-white shadow-md rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center">
-                <div className="flex-grow mb-3 sm:mb-0">
+              <div key={category._id} className="p-4 bg-white shadow-md rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border border-slate-200 hover:shadow-lg transition-shadow">
+                <div className="flex-grow">
                   <h3 className="text-lg font-semibold text-indigo-700">{category.name}</h3>
-                  {category.description && <p className="text-sm text-gray-600 mt-1">{category.description}</p>}
-                  <p className="text-xs text-gray-400 mt-1">ID: {category._id}</p>
+                  {category.description && <p className="text-sm text-slate-600 mt-1">{category.description}</p>}
+                  <p className="text-xs text-slate-400 mt-2">ID: {category._id}</p>
                 </div>
                 <div className="flex space-x-2 flex-shrink-0 self-end sm:self-center">
                   <button
                     onClick={() => startEdit(category)}
                     disabled={isLoading && editingId === category._id}
-                    className="py-1 px-3 text-xs sm:text-sm font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 rounded-md transition-colors disabled:opacity-50"
+                    className="py-2 px-4 text-sm font-semibold text-white bg-amber-500 hover:bg-amber-600 rounded-md transition-colors disabled:opacity-50"
                   >Sửa</button>
                   <button
                     onClick={() => handleDelete(category._id)}
                     disabled={isLoading}
-                    className="py-1 px-3 text-xs sm:text-sm font-medium text-red-700 bg-red-100 hover:bg-red-200 rounded-md transition-colors disabled:opacity-50"
+                    className="py-2 px-4 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors disabled:opacity-50"
                   >Xoá</button>
                 </div>
               </div>
@@ -318,10 +325,10 @@ const AdminCategories: React.FC = () => {
         )}
 
         {totalPages > 1 && (
-          <div className="mt-8 flex justify-center items-center">
-            <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1 || isLoading} className="mx-1 px-3 py-1 border rounded text-sm bg-white text-blue-500 hover:bg-blue-100 disabled:opacity-50">&laquo; Trước</button>
+          <div className="mt-8 flex justify-center items-center flex-wrap gap-2">
+            <button onClick={() => paginate(currentPage - 1)} disabled={currentPage === 1 || isLoading} className="py-2 px-4 border rounded-md text-sm bg-white text-slate-700 border-slate-300 hover:bg-slate-100 disabled:opacity-50">&laquo; Trước</button>
             {renderPageNumbers()}
-            <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages || isLoading} className="mx-1 px-3 py-1 border rounded text-sm bg-white text-blue-500 hover:bg-blue-100 disabled:opacity-50">Sau &raquo;</button>
+            <button onClick={() => paginate(currentPage + 1)} disabled={currentPage === totalPages || isLoading} className="py-2 px-4 border rounded-md text-sm bg-white text-slate-700 border-slate-300 hover:bg-slate-100 disabled:opacity-50">Sau &raquo;</button>
           </div>
         )}
       </div>

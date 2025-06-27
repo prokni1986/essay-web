@@ -1,4 +1,4 @@
-// file: routes/examRoutes.js (Phiên bản cuối cùng, tích hợp LỚP và TYPE MỚI)
+// file: routes/examRoutes.js
 
 import express from 'express';
 const router = express.Router();
@@ -15,6 +15,7 @@ import cloudinary from '../config/cloudinaryConfig.js';
 import puppeteer from 'puppeteer';
 
 // Helper function to generate and upload thumbnail (Giữ nguyên)
+// ... (Không có thay đổi trong hàm này)
 const generateAndUploadThumbnail = async (htmlContent, examTitle) => {
     let browser = null;
     try {
@@ -162,16 +163,16 @@ const generateAndUploadThumbnail = async (htmlContent, examTitle) => {
     }
 };
 
-
 // ===================================================================
 // === ROUTE CÔNG KHAI (PUBLIC ROUTES) ===
 // ===================================================================
 
-// Lấy danh sách tất cả đề thi (bao gồm trường 'grade' mới)
+// Lấy danh sách tất cả đề thi
 router.get('/', async (req, res) => {
     try {
         const exams = await Exam.find({})
-                                .select('-htmlContent -__v') // Sẽ tự động bao gồm 'grade'
+                                // THAY ĐỔI: Không gửi cả htmlContent và solutionHtml khi lấy danh sách
+                                .select('-htmlContent -solutionHtml -__v') 
                                 .sort({ year: -1, createdAt: -1 });
         res.json(exams);
     } catch (err) {
@@ -180,7 +181,20 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Lấy chi tiết một đề thi theo id (bao gồm trường 'grade' mới cho preview)
+// NEW ROUTE: Lấy danh sách các lớp học độc nhất
+router.get('/grades', async (req, res) => {
+  try {
+    const grades = await Exam.distinct('grade');
+    const cleanGrades = grades.filter(grade => grade !== null && grade !== undefined).sort((a, b) => a - b);
+    res.json(cleanGrades);
+  } catch (err) {
+    console.error("Error fetching distinct grades:", err);
+    res.status(500).json({ message: "Lỗi máy chủ khi lấy danh sách các lớp." });
+  }
+});
+
+
+// Lấy chi tiết một đề thi theo id
 router.get('/:id', authenticateTokenOptional, async (req, res) => {
     try {
         const exam = await Exam.findById(req.params.id).populate('topic');
@@ -196,9 +210,11 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
             }
         }
         
+        // THAY ĐỔI: Trả về toàn bộ object (bao gồm solutionHtml) nếu người dùng có quyền
         if (canViewFullContent) {
             res.json({ ...exam.toObject(), canViewFullContent: true });
         } else {
+            // THAY ĐỔI: Đảm bảo solutionHtml là null khi không có quyền
             res.json({
                 _id: exam._id,
                 title: exam.title,
@@ -211,11 +227,12 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
                 canViewFullContent: false,
                 previewContent: exam.description || "Vui lòng đăng ký để xem nội dung đầy đủ.",
                 htmlContent: null,
+                solutionHtml: null, // MỚI: Thêm trường này và set là null
                 type: exam.type,
                 duration: exam.duration,
                 questions: exam.questions,
                 difficulty: exam.difficulty,
-                grade: exam.grade, // BAO GỒM TRƯỜNG MỚI 'grade' CHO PREVIEW
+                grade: exam.grade,
             });
         }
     } catch (err) {
@@ -229,15 +246,15 @@ router.get('/:id', authenticateTokenOptional, async (req, res) => {
 // === ROUTE CHO ADMIN (CẦN XÁC THỰC VÀ QUYỀN ADMIN) ===
 // ===================================================================
 
-// 1. TẠO MỚI MỘT ĐỀ THI (POST) - Đã bao gồm trường 'grade' và các tùy chọn 'type' mới
+// 1. TẠO MỚI MỘT ĐỀ THI (POST)
 router.post(
     '/create-html-post',
     authenticateToken,
     isAdmin,
     async (req, res) => {
         try {
-            // Lấy TẤT CẢ các trường từ req.body
-            const { title, description, htmlContent, subject, year, province, type, duration, questions, difficulty, grade } = req.body;
+            // THAY ĐỔI: Lấy thêm solutionHtml từ req.body
+            const { title, description, htmlContent, solutionHtml, subject, year, province, type, duration, questions, difficulty, grade } = req.body;
             
             if (!title || !htmlContent || !subject || !year) {
                 return res.status(400).json({ message: 'Thiếu các trường thông tin bắt buộc: Tiêu đề, Nội dung HTML, Môn học, Năm.' });
@@ -249,6 +266,7 @@ router.post(
                 title,
                 description,
                 htmlContent,
+                solutionHtml, // MỚI: Thêm solutionHtml vào object tạo mới
                 subject,
                 year: Number(year),
                 province,
@@ -257,7 +275,7 @@ router.post(
                 duration: Number(duration) || undefined,
                 questions: Number(questions) || undefined,
                 difficulty,
-                grade: Number(grade) || undefined, // LƯU TRƯỜNG MỚI 'grade' VÀO DB
+                grade: Number(grade) || undefined,
             });
 
             await newExam.save();
@@ -269,22 +287,22 @@ router.post(
     }
 );
 
-// 2. CẬP NHẬT MỘT ĐỀ THI (PUT) - Đã bao gồm trường 'grade' và các tùy chọn 'type' mới
+// 2. CẬP NHẬT MỘT ĐỀ THI (PUT)
 router.put(
     '/:id',
     authenticateToken,
     isAdmin,
     async (req, res) => {
         try {
-            // Lấy TẤT CẢ các trường từ req.body
-            const { title, description, htmlContent, subject, year, province, type, duration, questions, difficulty, grade } = req.body;
+            // THAY ĐỔI: Lấy thêm solutionHtml từ req.body
+            const { title, description, htmlContent, solutionHtml, subject, year, province, type, duration, questions, difficulty, grade } = req.body;
 
             const exam = await Exam.findById(req.params.id);
             if (!exam) {
                 return res.status(404).json({ message: 'Không tìm thấy đề thi để cập nhật.' });
             }
 
-            // Cập nhật các trường thông tin một cách tường minh
+            // Cập nhật các trường thông tin
             exam.title = title;
             exam.description = description;
             exam.subject = subject;
@@ -294,7 +312,8 @@ router.put(
             exam.duration = Number(duration) || undefined;
             exam.questions = Number(questions) || undefined;
             exam.difficulty = difficulty;
-            exam.grade = Number(grade) || undefined; // CẬP NHẬT TRƯỜNG MỚI 'grade'
+            exam.grade = Number(grade) || undefined;
+            exam.solutionHtml = solutionHtml; // MỚI: Cập nhật trường solutionHtml
 
             if (exam.htmlContent !== htmlContent) {
                 console.log("[Update Exam] htmlContent changed, regenerating thumbnail.");

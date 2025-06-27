@@ -3,7 +3,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import axiosInstance from '../lib/axiosInstance';
 import Layout from '@/components/Layout';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../hooks/useAuth'; 
 import { Link } from 'react-router-dom';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";

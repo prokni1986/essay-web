@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react'; // Import useMemo
 import { Link } from 'react-router-dom';
 import axiosInstance from '../lib/axiosInstance';
 import Layout from '@/components/Layout';
+import Breadcrumbs, { BreadcrumbItem } from '@/components/Breadcrumbs'; // Import Breadcrumbs và BreadcrumbItem
 
 interface Topic {
   _id: string;
@@ -21,6 +22,9 @@ const AllTopic: React.FC = () => {
 
   // Logic fetch dữ liệu và xử lý state giữ nguyên
   useEffect(() => {
+    document.title = "Tất cả chủ đề"; // Thêm dòng này để cập nhật tiêu đề trang
+    window.scrollTo(0, 0); // Cuộn lên đầu trang khi component được mount
+
     const fetchTopics = async () => {
       setLoading(true);
       setError('');
@@ -98,6 +102,12 @@ const AllTopic: React.FC = () => {
     return pageNumbers;
   };
   
+  // Định nghĩa breadcrumb items (Đã di chuyển ra khỏi điều kiện if)
+  const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
+    { label: 'Trang chủ', path: '/' },
+    { label: 'Tất cả chủ đề', path: '/alltopic' },
+  ], []);
+
   // SỬA: Cập nhật giao diện Loading và Error
   if (loading) {
     return <Layout><div className="flex justify-center items-center min-h-screen"><p className="text-foreground text-xl">Đang tải...</p></div></Layout>;
@@ -106,17 +116,26 @@ const AllTopic: React.FC = () => {
     return <Layout><div className="flex justify-center items-center min-h-screen"><p className="text-destructive text-xl">{error}</p></div></Layout>;
   }
 
+
   return (
     <Layout>
+      {/* Thêm Breadcrumbs Section */}
+      <section className="bg-secondary/50 py-4 border-b border-border">
+        <div className="max-w-5xl mx-auto px-4">
+          <Breadcrumbs items={breadcrumbItems} />
+        </div>
+      </section>
+
       {/* SỬA: Bỏ style inline, dùng class của Tailwind */}
       <section className="py-10 px-4 bg-background">
         <div className="max-w-5xl mx-auto">
           <div className="px-8 py-10 mb-8">
-            <nav className="mb-6 text-sm flex items-center text-muted-foreground space-x-2">
+            {/* Nav cũ đã bị xóa, thay thế bằng Breadcrumbs ở trên */}
+            {/* <nav className="mb-6 text-sm flex items-center text-muted-foreground space-x-2">
               <Link to="/" className="hover:underline text-primary font-semibold">Trang chủ</Link>
               <span className="mx-1">/</span>
               <span className="text-foreground font-semibold">Tất cả chủ đề</span>
-            </nav>
+            </nav> */}
             <h1 className="text-4xl md:text-5xl font-heading font-bold mb-3 text-foreground text-center">
               Tất cả <span className="text-primary">Chủ đề</span>
             </h1>

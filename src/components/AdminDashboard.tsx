@@ -1,11 +1,15 @@
-// file: components/AdminDashboard.tsx
+// file: src/components/AdminDashboard.tsx
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import axios, { AxiosProgressEvent, AxiosError } from 'axios'; // Still needed for types and axios.isAxiosError
-import axiosInstance from '../lib/axiosInstance'; // Import axiosInstance
+import axios, { AxiosProgressEvent } from 'axios';
+import axiosInstance from '../lib/axiosInstance';
 import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import 'react-quill/dist/quill.snow.css'; // Import theme snow mặc định
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 const stripHtml = (html: string): string => {
+  if (typeof window === 'undefined') {
+    return '';
+  }
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
   return tmp.textContent || tmp.innerText || '';
@@ -15,13 +19,11 @@ interface Category {
   _id: string;
   name: string;
 }
-
 interface Topic {
   _id: string;
   name: string;
   category?: Category | string;
 }
-
 interface Essay {
   _id:string;
   title: string;
@@ -37,10 +39,11 @@ interface Essay {
 
 const quillModules = {
   toolbar: [
-    [{ 'header': [1, 2, false] }],
+    [{ 'header': [1, 2, 3, false] }],
     ['bold', 'italic', 'underline', 'strike'],
-    [{ 'list': 'ordered' }, { 'list': 'bullet' }],
-    ['link'],
+    [{'list': 'ordered'}, {'list': 'bullet'}],
+    [{ 'color': [] }, { 'background': [] }],
+    ['link', 'image'],
     ['clean']
   ],
 };
@@ -66,31 +69,28 @@ const AdminDashboard: React.FC = () => {
   const [audioFile2, setAudioFile2] = useState<File | null>(null);
   const [audioFile3, setAudioFile3] = useState<File | null>(null);
   const [audioFile4, setAudioFile4] = useState<File | null>(null);
-
   const [isSubmittingEssay, setIsSubmittingEssay] = useState<boolean>(false);
   const [formMessage, setFormMessage] = useState<string>('');
   const [formErrorDetails, setFormErrorDetails] = useState<string>('');
-
   const [uploadProgress, setUploadProgress] = useState(0);
   const [loadingEssays, setLoadingEssays] = useState(true);
   const [loadingMeta, setLoadingMeta] = useState(true);
-
   const audioFile1Ref = useRef<HTMLInputElement | null>(null);
   const audioFile2Ref = useRef<HTMLInputElement | null>(null);
   const audioFile3Ref = useRef<HTMLInputElement | null>(null);
   const audioFile4Ref = useRef<HTMLInputElement | null>(null);
-
   const [adminSearchTerm, setAdminSearchTerm] = useState('');
   const [adminSelectedTopicFilter, setAdminSelectedTopicFilter] = useState<string>('Tất cả');
   const [adminDisplayedEssays, setAdminDisplayedEssays] = useState<Essay[]>([]);
   const [adminCurrentPage, setAdminCurrentPage] = useState(1);
+  const [isEssayListVisible, setIsEssayListVisible] = useState(true);
 
   const fetchMetaData = useCallback(async () => {
     setLoadingMeta(true);
     try {
       const [categoriesRes, topicsRes] = await Promise.all([
-        axiosInstance.get<Category[]>('/api/categories'), // Use axiosInstance
-        axiosInstance.get<Topic[]>('/api/topics')         // Use axiosInstance
+        axiosInstance.get<Category[]>('/api/categories'),
+        axiosInstance.get<Topic[]>('/api/topics')
       ]);
       const fetchedCategories = Array.isArray(categoriesRes.data) ? categoriesRes.data : [];
       setAllCategories([{ _id: 'Tất cả', name: 'Tất cả Chuyên mục' }, ...fetchedCategories]);
@@ -107,9 +107,6 @@ const AdminDashboard: React.FC = () => {
       console.error("Lỗi fetchMetaData (categories/topics):", error);
       setFormMessage('Lỗi');
       setFormErrorDetails('Không thể tải dữ liệu chuyên mục hoặc chủ đề.');
-      setAllCategories([{ _id: 'Tất cả', name: 'Tất cả Chuyên mục' }]);
-      setActualCategoriesForForm([]);
-      setTopicsForFilterDropdown([{ _id: 'Tất cả', name: 'Tất cả Chủ đề' }]);
     } finally {
       setLoadingMeta(false);
     }
@@ -118,12 +115,11 @@ const AdminDashboard: React.FC = () => {
   const fetchEssays = useCallback(async () => {
     setLoadingEssays(true);
     try {
-      const response = await axiosInstance.get<Essay[]>('/api/essays'); // Use axiosInstance
+      const response = await axiosInstance.get<Essay[]>('/api/essays');
       setAllFetchedEssays(response.data.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()));
     } catch (error) {
       setFormMessage('Lỗi');
       setFormErrorDetails('Không thể lấy danh sách bài luận.');
-      console.error("Lỗi fetchEssays:", error);
     } finally {
       setLoadingEssays(false);
     }
@@ -253,7 +249,6 @@ const AdminDashboard: React.FC = () => {
     }
 
     setIsSubmittingEssay(true);
-
     const formData = new FormData();
     formData.append('title', title); formData.append('outline', outline);
     formData.append('content', content); formData.append('essay2', essay2); formData.append('essay3', essay3);
@@ -273,64 +268,48 @@ const AdminDashboard: React.FC = () => {
       };
       const actionText = editingEssay ? 'Cập nhật' : 'Tạo mới';
       if (editingEssay) {
-        await axiosInstance.put(`/api/essays/${editingEssay._id}`, formData, config); // Use axiosInstance
+        await axiosInstance.put(`/api/essays/${editingEssay._id}`, formData, config);
       } else {
-        await axiosInstance.post('/api/essays/upload', formData, config); // Use axiosInstance
+        await axiosInstance.post('/api/essays/upload', formData, config);
       }
       setFormMessage(`${actionText} bài luận thành công!`);
       resetForm();
-      fetchEssays();
+      await fetchEssays();
     } catch (error: unknown) {
       const actionText = editingEssay ? 'Cập nhật' : 'Tạo mới';
       setFormMessage(`${actionText} bài luận thất bại!`);
-      if (axios.isAxiosError(error)) { // This check is still valid with axiosInstance errors
+      if (axios.isAxiosError(error)) {
         const errData = error.response?.data as { error?: string };
-        setFormErrorDetails(errData?.error || error.message || `Lỗi không xác định khi ${actionText.toLowerCase()} bài luận.`);
+        setFormErrorDetails(errData?.error || error.message || `Lỗi không xác định.`);
       }
       else if (error instanceof Error) { setFormErrorDetails(error.message); }
-      else { setFormErrorDetails(`Lỗi không xác định khi ${actionText.toLowerCase()} bài luận.`);}
-      console.error(`Lỗi ${actionText.toLowerCase()} bài luận:`, error);
+      else { setFormErrorDetails(`Lỗi không xác định.`);}
     } finally {
       setIsSubmittingEssay(false);
-      setTimeout(() => {
-        setUploadProgress(0);
-      }, 1500);
-      setTimeout(() => {
-        setFormMessage('');
-        setFormErrorDetails('');
-      }, 7000);
+      setTimeout(() => { setUploadProgress(0); }, 1500);
+      setTimeout(() => { setFormMessage(''); setFormErrorDetails(''); }, 7000);
     }
   };
 
   const handleDelete = async (id: string) => {
     const essayToDelete = allFetchedEssays.find(e => e._id === id);
-    const confirmDelete = window.confirm(
-        `Bạn có chắc chắn muốn xóa bài luận "${essayToDelete?.title || 'này'}" không? \nHành động này không thể hoàn tác.`
-    );
-    if (!confirmDelete) return;
-
+    if (!window.confirm(`Bạn có chắc muốn xóa bài luận "${essayToDelete?.title || 'này'}" không?`)) return;
     setFormMessage(''); setFormErrorDetails('');
-
     try {
-      await axiosInstance.delete(`/api/essays/${id}`); // Use axiosInstance
-      fetchEssays();
+      await axiosInstance.delete(`/api/essays/${id}`);
+      await fetchEssays();
       setFormMessage(`Đã xóa bài luận "${essayToDelete?.title || ''}" thành công.`);
-      if (editingEssay?._id === id) {
-        resetForm();
-      }
+      if (editingEssay?._id === id) resetForm();
     } catch (error) {
         setFormMessage('Xóa bài luận thất bại!');
-        if (axios.isAxiosError(error)) { // This check is still valid
+        if (axios.isAxiosError(error)) {
             const errData = error.response?.data as { error?: string };
-            setFormErrorDetails(errData?.error || 'Lỗi không xác định khi xóa bài luận.');
+            setFormErrorDetails(errData?.error || 'Lỗi không xác định.');
         } else {
-            setFormErrorDetails('Lỗi không xác định khi xóa bài luận.');
+            setFormErrorDetails('Lỗi không xác định.');
         }
     } finally {
-        setTimeout(() => {
-            setFormMessage('');
-            setFormErrorDetails('');
-        }, 7000);
+        setTimeout(() => { setFormMessage(''); setFormErrorDetails(''); }, 7000);
     }
   };
 
@@ -339,7 +318,7 @@ const AdminDashboard: React.FC = () => {
     const formElement = document.getElementById('essay-form-section');
     if (formElement) formElement.scrollIntoView({ behavior: 'smooth' });
   };
-
+  
   const getTopicDisplayInfo = useCallback((essayTopic?: Topic | string | null): { topicName: string; categoryName: string } => {
     if (!essayTopic) return { topicName: 'Chưa phân loại', categoryName: 'N/A' };
     if (typeof essayTopic === 'object' && essayTopic !== null) {
@@ -376,21 +355,14 @@ const AdminDashboard: React.FC = () => {
         const topic = essay.topic;
         if (topic && typeof topic === 'object' && topic.category) {
           const category = topic.category;
-          if (typeof category === 'object' && category._id) {
-            return category._id === selectedAdminCategoryFilter;
-          }
-          return category === selectedAdminCategoryFilter;
-        }
-        return false;
+          return (typeof category === 'object' && category._id) ? category._id === selectedAdminCategoryFilter : category === selectedAdminCategoryFilter;
+        } return false;
       });
     }
     if (adminSelectedTopicFilter !== 'Tất cả') {
       filteredResults = filteredResults.filter(essay => {
         const topic = essay.topic;
-        if (topic && typeof topic === 'object' && topic._id) {
-          return topic._id === adminSelectedTopicFilter;
-        }
-        return topic === adminSelectedTopicFilter;
+        return (topic && typeof topic === 'object' && topic._id) ? topic._id === adminSelectedTopicFilter : topic === adminSelectedTopicFilter;
       });
     }
     if (adminSearchTerm.trim()) {
@@ -401,8 +373,6 @@ const AdminDashboard: React.FC = () => {
           essay.title.toLowerCase().includes(lowerSearch) ||
           stripHtml(essay.content).toLowerCase().includes(lowerSearch) ||
           (essay.outline && stripHtml(essay.outline).toLowerCase().includes(lowerSearch)) ||
-          (essay.essay2 && stripHtml(essay.essay2).toLowerCase().includes(lowerSearch)) ||
-          (essay.essay3 && stripHtml(essay.essay3).toLowerCase().includes(lowerSearch)) ||
           topicName.toLowerCase().includes(lowerSearch) ||
           categoryName.toLowerCase().includes(lowerSearch)
         );
@@ -416,7 +386,7 @@ const AdminDashboard: React.FC = () => {
   const adminIndexOfLastEssay = adminCurrentPage * ITEMS_PER_PAGE_ADMIN;
   const adminIndexOfFirstEssay = adminIndexOfLastEssay - ITEMS_PER_PAGE_ADMIN;
   const adminEssaysForCurrentPage = adminDisplayedEssays.slice(adminIndexOfFirstEssay, adminIndexOfLastEssay);
-
+  
   const handleAdminPageChange = (page: number) => {
     if (page > 0 && page <= adminTotalPages) {
       setAdminCurrentPage(page);
@@ -424,248 +394,239 @@ const AdminDashboard: React.FC = () => {
         if (listContainer) { listContainer.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     }
   };
-  const renderAdminPageNumbers = () => {
-    const pageNumbers = []; const maxPageButtons = 3; let startPage: number, endPage: number;
-    if (adminTotalPages <= maxPageButtons) { startPage = 1; endPage = adminTotalPages; }
-    else { const maxPagesBeforeCurrentPage = Math.floor(maxPageButtons / 2); const maxPagesAfterCurrentPage = Math.ceil(maxPageButtons / 2) - 1; if (adminCurrentPage <= maxPagesBeforeCurrentPage) { startPage = 1; endPage = maxPageButtons; } else if (adminCurrentPage + maxPagesAfterCurrentPage >= adminTotalPages) { startPage = adminTotalPages - maxPageButtons + 1; endPage = adminTotalPages; } else { startPage = adminCurrentPage - maxPagesBeforeCurrentPage; endPage = adminCurrentPage + maxPagesAfterCurrentPage; }}
-    if (startPage > 1) { pageNumbers.push(<button key="admin-1" onClick={() => handleAdminPageChange(1)} className="py-2 px-4 mx-1 border rounded-md text-sm bg-[#2c2c34] text-gray-300 border-gray-600 hover:bg-gray-600">1</button>); if (startPage > 2) { pageNumbers.push(<span key="admin-start-ellipsis" className="py-2 px-4 mx-1 text-gray-400">...</span>);}}
-    for (let i = startPage; i <= endPage; i++) { pageNumbers.push( <button key={`admin-${i}`} onClick={() => handleAdminPageChange(i)} className={`py-2 px-4 mx-1 border rounded-md text-sm ${adminCurrentPage === i ? 'bg-yellow-500 text-gray-900 border-yellow-500' : 'bg-[#2c2c34] text-gray-300 border-gray-600 hover:bg-gray-600'}`}>{i}</button> );}
-    if (endPage < adminTotalPages) { if (endPage < adminTotalPages - 1) { pageNumbers.push(<span key="admin-end-ellipsis" className="py-2 px-4 mx-1 text-gray-400">...</span>); } pageNumbers.push(<button key={`admin-${adminTotalPages}`} onClick={() => handleAdminPageChange(adminTotalPages)} className="py-2 px-4 mx-1 border rounded-md text-sm bg-[#2c2c34] text-gray-300 border-gray-600 hover:bg-gray-600">{adminTotalPages}</button>);}
-    return pageNumbers;
+  const renderAdminPageNumbers = () => { 
+      const pages = [];
+      for(let i = 1; i <= adminTotalPages; i++) {
+          pages.push(
+            <button key={i} onClick={() => handleAdminPageChange(i)} disabled={i === adminCurrentPage} className={`py-2 px-4 border rounded-md text-sm disabled:opacity-100 ${i === adminCurrentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'}`}>
+                {i}
+            </button>
+          )
+      }
+      return pages;
   };
 
-  const isLoadingOverall = loadingEssays || loadingMeta;
-  if (isLoadingOverall) {
+  if (loadingEssays || loadingMeta) {
     return (
-      <div className="container mx-auto p-4 bg-gray-900 text-white min-h-screen flex justify-center items-center">
+      <div className="container mx-auto p-4 bg-slate-50 text-slate-800 min-h-screen flex justify-center items-center">
         <div>
-            <div className="inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-current border-r-transparent align-[-0.125em] text-yellow-400 motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
-                <span className="!absolute !-m-px !h-px !w-px !overflow-hidden !whitespace-nowrap !border-0 !p-0 ![clip:rect(0,0,0,0)]">Loading...</span>
-            </div>
-            <p className="mt-3 text-xl">Đang tải dữ liệu Dashboard...</p>
+            <div className="w-12 h-12 rounded-full animate-spin border-4 border-solid border-indigo-500 border-t-transparent"></div>
+            <p className="mt-4 text-xl">Đang tải dữ liệu...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-4 bg-gray-900 text-white min-h-screen">
-      <h1 className="text-3xl font-bold mb-6 text-center text-yellow-400">Admin Dashboard - Quản lý Bài Luận</h1>
-      {!editingEssay && ( <button onClick={startNewEssayMode} className="mb-6 py-2 px-4 rounded bg-indigo-500 hover:bg-indigo-600 text-white font-semibold shadow-lg transition-colors"> + Tạo Bài Luận Mới </button> )}
+    <div className="container mx-auto p-4 sm:p-6 bg-slate-50 text-slate-800 min-h-screen font-sans">
+      <h1 className="text-3xl font-bold mb-6 text-center text-slate-800">Quản lý Bài Luận</h1>
+      
+      {!editingEssay && ( 
+        <button onClick={startNewEssayMode} className="mb-6 py-2 px-5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-md hover:shadow-lg transition-all duration-200">
+          + Tạo Bài Luận Mới
+        </button> 
+      )}
       
       {formMessage && (
-        <div
-            className={`mb-4 p-3 rounded ${formErrorDetails || formMessage.includes('Lỗi') || formMessage.includes('thất bại') ?
-                'bg-red-700 border border-red-500' :
-                'bg-green-700 border border-green-500'
-            } text-white shadow-md`}
-        >
-            {formMessage}
+        <div className={`mb-4 p-4 rounded-lg border text-center ${formErrorDetails || formMessage.includes('Lỗi') || formMessage.includes('thất bại') ? 'bg-red-100 border-red-300 text-red-800' : 'bg-green-100 border-green-300 text-green-800'} shadow-sm`}>
+            <p className="font-medium">{formMessage}</p>
+            {formErrorDetails && <p className="text-sm mt-1 whitespace-pre-wrap">{`Chi tiết: ${formErrorDetails}`}</p>}
         </div>
       )}
-      {formErrorDetails && (
-        <div className="mb-4 p-3 rounded bg-red-700 border border-red-500 text-white whitespace-pre-wrap shadow-md">
-            Chi tiết lỗi: {formErrorDetails}
-        </div>
-      )}
+
       {uploadProgress > 0 && uploadProgress < 100 && isSubmittingEssay && (
-        <div className="w-full bg-gray-700 rounded-full mb-4 overflow-hidden border border-gray-600 shadow-inner">
-            <div
-                className="bg-blue-500 text-xs font-bold text-white text-center p-1 leading-none rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${uploadProgress}%` }}
-            >
-                {uploadProgress > 5 ? `${uploadProgress}%` : ''}
+        <div className="w-full bg-slate-200 rounded-full mb-4 border border-slate-300">
+            <div className="bg-blue-500 text-xs font-bold text-blue-100 text-center p-0.5 leading-none rounded-full" style={{ width: `${uploadProgress}%` }}>
+                {uploadProgress > 10 ? `${uploadProgress}%` : ''}
             </div>
         </div>
       )}
 
-      <form id="essay-form-section" onSubmit={handleSubmit} className="bg-gray-800 p-6 rounded-lg shadow-xl mb-8 border border-gray-700" encType="multipart/form-data" >
-        <h2 className="text-2xl font-bold mb-6 text-yellow-400 border-b border-gray-700 pb-3"> {editingEssay ? `Chỉnh sửa: ${editingEssay.title}` : 'Tạo Bài Luận Mới'} </h2>
+      {/* FORM SOẠN THẢO */}
+      <form id="essay-form-section" onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow-lg mb-8 border border-slate-200" encType="multipart/form-data">
+        <h2 className="text-2xl font-bold mb-6 text-slate-700 border-b border-slate-200 pb-4">
+          {editingEssay ? `Chỉnh sửa: ${editingEssay.title}` : 'Soạn Bài Luận Mới'}
+        </h2>
         
-        <div className="mb-4"> <label className="block text-gray-300 font-semibold mb-1">Tiêu đề:<span className="text-red-500">*</span></label> <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none" required disabled={isSubmittingEssay}/> </div>
-        <div className="mb-4"> <label className="block text-gray-300 font-semibold mb-1">Dàn ý:</label> <ReactQuill readOnly={isSubmittingEssay} value={outline} onChange={setOutline} theme="snow" modules={quillModules} className="bg-gray-700 text-white quill-dark-theme rounded" style={{ minHeight: '150px' }}/> </div>
-        <div className="mb-4"> <label className="block text-gray-300 font-semibold mb-1">Bài luận 1 (Nội dung chính):<span className="text-red-500">*</span></label> <ReactQuill readOnly={isSubmittingEssay} value={content} onChange={setContent} theme="snow" modules={quillModules} className="bg-gray-700 text-white quill-dark-theme rounded" style={{ minHeight: '250px' }}/> </div>
-        <div className="mb-4"> <label className="block text-gray-300 font-semibold mb-1">Bài luận 2 (Nếu có):</label> <ReactQuill readOnly={isSubmittingEssay} value={essay2} onChange={setEssay2} theme="snow" modules={quillModules} className="bg-gray-700 text-white quill-dark-theme rounded" style={{ minHeight: '200px' }}/> </div>
-        <div className="mb-4"> <label className="block text-gray-300 font-semibold mb-1">Bài luận 3 (Nếu có):</label> <ReactQuill readOnly={isSubmittingEssay} value={essay3} onChange={setEssay3} theme="snow" modules={quillModules} className="bg-gray-700 text-white quill-dark-theme rounded" style={{ minHeight: '200px' }}/> </div>
-        
-        <div className="mb-4">
-          <label htmlFor="formCategorySelect" className="block text-gray-300 font-semibold mb-1">Chuyên mục (Category):<span className="text-red-500">*</span></label>
-          <select
-            id="formCategorySelect"
-            value={selectedCategoryInForm}
-            onChange={e => setSelectedCategoryInForm(e.target.value)}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none"
-            required
-            disabled={isSubmittingEssay || (actualCategoriesForForm.length === 0 && !loadingMeta)}
-          >
-            <option value="">-- Chọn chuyên mục --</option>
-            {actualCategoriesForForm.map(cat => (
-                <option key={cat._id} value={cat._id}>{cat.name}</option>
-            ))}
-          </select>
-           {actualCategoriesForForm.length === 0 && !loadingMeta && <p className="text-xs text-yellow-400 mt-1">Vui lòng tạo Chuyên mục ở trang "Quản lý Chuyên mục" trước.</p>}
-        </div>
-        
-        <div className="mb-4">
-          <label htmlFor="formTopicSelect" className="block text-gray-300 font-semibold mb-1">Chủ đề (Topic):<span className="text-red-500">*</span></label>
-          <select
-            id="formTopicSelect"
-            value={selectedTopicForm}
-            onChange={e => setSelectedTopicForm(e.target.value)}
-            className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none"
-            required
-            disabled={isSubmittingEssay || !selectedCategoryInForm || topicsForEssayFormDropdown.length === 0 || loadingMeta}
-          >
-            <option value="">
-                {!selectedCategoryInForm
-                    ? "-- Vui lòng chọn chuyên mục trước --"
-                    : (topicsForEssayFormDropdown.length > 0
-                        ? "-- Chọn chủ đề --"
-                        : "-- Không có chủ đề trong chuyên mục này --")
-                }
-            </option>
-            {topicsForEssayFormDropdown.map(t => (
-                <option key={t._id} value={t._id}>{t.name}</option>
-            ))}
-          </select>
-          {selectedCategoryInForm && topicsForEssayFormDropdown.length === 0 && !loadingMeta && <p className="text-xs text-yellow-400 mt-1">Chuyên mục này chưa có Chủ đề nào. Vui lòng tạo Chủ đề ở trang "Quản lý Chủ đề" trước.</p>}
-        </div>
-
-        {[1, 2, 3, 4].map(num => {
-            let currentFileState: File | null = null;
-            let setFileState: React.Dispatch<React.SetStateAction<File | null>> = () => {};
-            let fileRef: React.RefObject<HTMLInputElement | null> = audioFile1Ref;
-            const existingAudioUrl = editingEssay?.audioFiles?.[num - 1];
-            switch (num) {
-                case 1: currentFileState = audioFile1; setFileState = setAudioFile1; fileRef = audioFile1Ref; break;
-                case 2: currentFileState = audioFile2; setFileState = setAudioFile2; fileRef = audioFile2Ref; break;
-                case 3: currentFileState = audioFile3; setFileState = setAudioFile3; fileRef = audioFile3Ref; break;
-                case 4: currentFileState = audioFile4; setFileState = setAudioFile4; fileRef = audioFile4Ref; break;
-            }
-          return (
-            <div className="mb-4" key={`audio-upload-${num}`}>
-                <label className="block text-gray-300 font-semibold mb-1">File Âm Thanh {num} (Tùy chọn):</label>
-                <input
-                    ref={fileRef}
-                    type="file"
-                    accept="audio/*"
-                    onChange={e => setFileState(e.target.files?.[0] || null)}
-                    className="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-yellow-500 file:text-gray-900 hover:file:bg-yellow-400"
-                    disabled={isSubmittingEssay}
-                />
-                {existingAudioUrl && !currentFileState && (
-                    <div className="mt-2">
-                        <p className="text-xs text-gray-400 mb-1">File hiện tại ({num}):</p>
-                        <audio controls className="w-full rounded-lg custom-audio-controls">
-                            <source src={existingAudioUrl} /> Your browser does not support the audio element.
-                        </audio>
-                    </div>
-                )}
-                {currentFileState && ( <span className="text-sm text-green-400 mt-1 block">Đã chọn: {currentFileState.name}</span> )}
+        <div className="bg-slate-50/50 p-4 rounded-lg border border-slate-200 mb-6">
+            <h3 className="text-lg font-semibold text-slate-600 mb-3">1. Phân loại Bài luận</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label htmlFor="formCategorySelect" className="block text-sm text-slate-600 font-medium mb-1">Chuyên mục:<span className="text-red-500">*</span></label>
+                    <select id="formCategorySelect" value={selectedCategoryInForm} onChange={e => setSelectedCategoryInForm(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded-md text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none" required disabled={isSubmittingEssay || (actualCategoriesForForm.length === 0)}>
+                        <option value="">-- Chọn chuyên mục --</option>
+                        {actualCategoriesForForm.map(cat => (<option key={cat._id} value={cat._id}>{cat.name}</option>))}
+                    </select>
+                </div>
+                <div>
+                    <label htmlFor="formTopicSelect" className="block text-sm text-slate-600 font-medium mb-1">Chủ đề:<span className="text-red-500">*</span></label>
+                    <select id="formTopicSelect" value={selectedTopicForm} onChange={e => setSelectedTopicForm(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded-md text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none" required disabled={isSubmittingEssay || !selectedCategoryInForm || topicsForEssayFormDropdown.length === 0}>
+                        <option value="">{!selectedCategoryInForm ? "-- Chọn chuyên mục trước --" : (topicsForEssayFormDropdown.length > 0 ? "-- Chọn chủ đề --" : "-- Không có chủ đề --")}</option>
+                        {topicsForEssayFormDropdown.map(t => (<option key={t._id} value={t._id}>{t.name}</option>))}
+                    </select>
+                </div>
             </div>
-          );
-        })}
+        </div>
 
-        <div className="mt-6 flex gap-3">
-            <button
-                type="submit"
-                className="py-2 px-6 rounded bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-semibold transition-colors shadow-md disabled:opacity-50"
-                disabled={isSubmittingEssay || (uploadProgress > 0 && uploadProgress < 100 && !formMessage.includes('thành công')) || !selectedTopicForm || !selectedCategoryInForm || loadingMeta}
-            >
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="bg-slate-50/50 p-4 rounded-lg border border-slate-200 flex flex-col">
+                <h3 className="text-lg font-semibold text-slate-600 mb-3">2. Tiêu đề & Dàn ý</h3>
+                <div className="mb-4">
+                    <label className="block text-sm text-slate-600 font-medium mb-1">Tiêu đề:<span className="text-red-500">*</span></label>
+                    <input type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded-md text-slate-900 focus:ring-2 focus:ring-indigo-500 outline-none" required disabled={isSubmittingEssay}/>
+                </div>
+                 <div className="flex-grow">
+                    <label className="block text-sm text-slate-600 font-medium mb-1">Dàn ý (tùy chọn):</label>
+                    <ReactQuill readOnly={isSubmittingEssay} value={outline} onChange={setOutline} theme="snow" modules={quillModules} className="bg-white text-slate-900 custom-quill-light"/>
+                </div>
+            </div>
+
+            <div className="bg-slate-50/50 p-4 rounded-lg border border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-600 mb-3">3. Tải lên Âm thanh</h3>
+                <div className="space-y-4">
+                    {[1, 2, 3, 4].map(num => {
+                        const currentFile = [audioFile1, audioFile2, audioFile3, audioFile4][num - 1];
+                        const setFileState = [setAudioFile1, setAudioFile2, setAudioFile3, setAudioFile4][num - 1];
+                        const fileRef = [audioFile1Ref, audioFile2Ref, audioFile3Ref, audioFile4Ref][num - 1];
+                        const existingAudioUrl = editingEssay?.audioFiles?.[num - 1];
+                    return (
+                        <div key={`audio-upload-${num}`}>
+                            <label className="block text-sm text-slate-500 mb-1">File Âm Thanh {num} (tùy chọn):</label>
+                            <input ref={fileRef} type="file" accept="audio/*" onChange={e => setFileState(e.target.files?.[0] || null)} className="w-full text-sm text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200 transition-colors cursor-pointer" disabled={isSubmittingEssay}/>
+                            {existingAudioUrl && !currentFile && (
+                                <div className="mt-2"><p className="text-xs text-slate-500 mb-1">File hiện tại:</p><audio controls src={existingAudioUrl} className="w-full h-8 rounded-lg" /></div>
+                            )}
+                            {currentFile && ( <span className="text-xs text-green-600 mt-1 block">Đã chọn file mới: {currentFile.name}</span> )}
+                        </div>
+                    );
+                    })}
+                </div>
+            </div>
+        </div>
+
+        <div className="bg-slate-50/50 p-4 rounded-lg border border-slate-200">
+            <h3 className="text-lg font-semibold text-slate-600 mb-3">4. Nội dung chi tiết</h3>
+            <div className="space-y-6">
+                <div>
+                    <label className="block text-sm text-slate-600 font-medium mb-1">Bài luận 1 (Nội dung chính):<span className="text-red-500">*</span></label>
+                    <ReactQuill readOnly={isSubmittingEssay} value={content} onChange={setContent} theme="snow" modules={quillModules} className="bg-white text-slate-900 custom-quill-light" style={{ minHeight: '250px' }}/>
+                </div>
+                <div>
+                    <label className="block text-sm text-slate-600 font-medium mb-1">Bài luận 2 (Nếu có):</label>
+                    <ReactQuill readOnly={isSubmittingEssay} value={essay2} onChange={setEssay2} theme="snow" modules={quillModules} className="bg-white text-slate-900 custom-quill-light" style={{ minHeight: '200px' }}/>
+                </div>
+                <div>
+                    <label className="block text-sm text-slate-600 font-medium mb-1">Bài luận 3 (Nếu có):</label>
+                    <ReactQuill readOnly={isSubmittingEssay} value={essay3} onChange={setEssay3} theme="snow" modules={quillModules} className="bg-white text-slate-900 custom-quill-light" style={{ minHeight: '200px' }}/>
+                </div>
+            </div>
+        </div>
+
+        <div className="mt-8 flex flex-col sm:flex-row gap-3">
+             <button type="submit" className={`py-2.5 px-6 rounded-lg font-semibold text-white transition-colors shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${editingEssay ? 'bg-amber-500 hover:bg-amber-600' : 'bg-indigo-600 hover:bg-indigo-700'}`} disabled={isSubmittingEssay || !selectedTopicForm || !selectedCategoryInForm}>
                 {isSubmittingEssay ? (editingEssay ? 'Đang cập nhật...' : 'Đang tạo...') : (editingEssay ? 'Lưu Chỉnh Sửa' : 'Tạo Bài Luận')}
             </button>
-            <button
-                type="button"
-                onClick={startNewEssayMode}
-                className="py-2 px-6 rounded bg-gray-600 hover:bg-gray-500 text-white font-semibold transition-colors shadow-md"
-                disabled={isSubmittingEssay}
-            >
-                {editingEssay ? 'Hủy Chỉnh Sửa' : 'Làm Mới Form'}
+            <button type="button" onClick={startNewEssayMode} className="py-2.5 px-6 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-800 font-semibold transition-colors shadow-md" disabled={isSubmittingEssay}>
+                {editingEssay ? 'Hủy & Tạo mới' : 'Làm Mới Form'}
             </button>
         </div>
       </form>
 
       <div id="admin-essay-list-section" className="mt-12">
-        <h2 className="text-2xl font-bold mb-6 text-yellow-400 border-b border-gray-700 pb-3">Danh Sách Bài Luận Hiện Có ({adminDisplayedEssays.length})</h2>
-        <div className="bg-gray-800 p-4 rounded-lg shadow-lg mb-6 border border-gray-700">
-            <div className="mb-4"> <input type="text" value={adminSearchTerm} onChange={e => setAdminSearchTerm(e.target.value)} placeholder="Tìm kiếm trong danh sách bài luận..." className="w-full p-3 bg-[#2c2c34] text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none placeholder-gray-400" /> </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label htmlFor="categoryFilterAdmin" className="block text-md font-semibold mb-2 text-gray-300">Lọc theo Chuyên mục (Category):</label>
-                    <select
-                        id="categoryFilterAdmin"
-                        value={selectedAdminCategoryFilter}
-                        onChange={e => setSelectedAdminCategoryFilter(e.target.value)}
-                        className="w-full p-3 bg-[#2c2c34] text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none"
-                    >
-                        {allCategories.map(cat => (
-                            <option key={cat._id} value={cat._id}>{cat.name}</option>
-                        ))}
-                    </select>
+        <div className="border-b border-slate-300 mb-6">
+            <button onClick={() => setIsEssayListVisible(!isEssayListVisible)} className="w-full flex justify-between items-center py-3 text-2xl font-bold text-slate-700 focus:outline-none">
+                <span>Danh Sách Bài Luận ({adminDisplayedEssays.length})</span>
+                {isEssayListVisible ? <ChevronUp className="w-7 h-7" /> : <ChevronDown className="w-7 h-7" />}
+            </button>
+        </div>
+
+        {isEssayListVisible && (
+            <div className="animate-slideDown">
+                <div className="bg-white p-4 rounded-lg shadow-lg mb-6 border border-slate-200">
+                    <div className="mb-4">
+                        <input type="text" value={adminSearchTerm} onChange={e => setAdminSearchTerm(e.target.value)} placeholder="Tìm kiếm tiêu đề, nội dung, chủ đề..." className="w-full p-3 bg-slate-50 text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none placeholder-slate-400" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="categoryFilterAdmin" className="block text-sm font-medium mb-1 text-slate-600">Lọc theo Chuyên mục:</label>
+                            <select id="categoryFilterAdmin" value={selectedAdminCategoryFilter} onChange={e => setSelectedAdminCategoryFilter(e.target.value)} className="w-full p-3 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                                {allCategories.map(cat => (<option key={cat._id} value={cat._id}>{cat.name}</option>))}
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="topicFilterAdmin" className="block text-sm font-medium mb-1 text-slate-600">Lọc theo Chủ đề:</label>
+                            <select id="topicFilterAdmin" value={adminSelectedTopicFilter} onChange={e => setAdminSelectedTopicFilter(e.target.value)} className="w-full p-3 bg-white text-slate-900 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" disabled={topicsForFilterDropdown.length <=1 && selectedAdminCategoryFilter === 'Tất cả'}>
+                                {topicsForFilterDropdown.map(topic => (<option key={topic._id} value={topic._id}>{topic.name}</option>))}
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label htmlFor="topicFilterAdmin" className="block text-md font-semibold mb-2 text-gray-300">Lọc theo Chủ đề (Topic):</label>
-                    <select
-                        id="topicFilterAdmin"
-                        value={adminSelectedTopicFilter}
-                        onChange={e => setAdminSelectedTopicFilter(e.target.value)}
-                        className="w-full p-3 bg-[#2c2c34] text-white border border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 outline-none"
-                        disabled={topicsForFilterDropdown.length <=1 && selectedAdminCategoryFilter === 'Tất cả'}
-                    >
-                        {topicsForFilterDropdown.map(topic => (
-                            <option key={topic._id} value={topic._id}>{topic.name}</option>
-                        ))}
-                    </select>
+
+                {adminEssaysForCurrentPage.length === 0 && !loadingEssays && ( <div className="text-center py-10 bg-white rounded-lg shadow-md border border-slate-200"><p className="text-slate-500">Không tìm thấy bài luận nào phù hợp.</p></div> )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {adminEssaysForCurrentPage.map(essay => {
+                      const { topicName, categoryName } = getTopicDisplayInfo(essay.topic);
+                      return (
+                          <div key={essay._id} className="bg-white p-5 rounded-lg shadow-md border border-slate-200 flex flex-col justify-between hover:shadow-xl transition-shadow duration-200">
+                              <div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2 truncate" title={essay.title}>{essay.title}</h3>
+                                <p className="text-sm text-indigo-600 mb-1 font-medium">Chuyên mục: {categoryName}</p>
+                                <p className="text-sm text-teal-600 mb-4 font-medium">Chủ đề: {topicName}</p>
+                                {essay.outline && ( <details className="mb-2 text-sm"><summary className="cursor-pointer text-slate-500 hover:text-slate-800 font-medium">Xem Dàn Ý</summary><div className="mt-2 p-3 bg-slate-50 rounded-md border border-slate-200 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: essay.outline }} /></details> )}
+                                <details className="mb-2 text-sm"> <summary className="cursor-pointer text-slate-500 hover:text-slate-800 font-medium">Xem Bài luận 1</summary> <div className="mt-2 p-3 bg-slate-50 rounded-md border border-slate-200 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: essay.content }} /> </details>
+                                {essay.essay2 && ( <details className="mb-2 text-sm"><summary className="cursor-pointer text-slate-500 hover:text-slate-800 font-medium">Xem Bài luận 2</summary><div className="mt-2 p-3 bg-slate-50 rounded-md border border-slate-200 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: essay.essay2 }} /></details> )}
+                                {essay.essay3 && ( <details className="mb-2 text-sm"><summary className="cursor-pointer text-slate-500 hover:text-slate-800 font-medium">Xem Bài luận 3</summary><div className="mt-2 p-3 bg-slate-50 rounded-md border border-slate-200 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: essay.essay3 }} /></details> )}
+                                {essay.audioFiles && essay.audioFiles.length > 0 && ( <div className="mt-4 pt-3 border-t border-slate-200"> <p className="text-xs text-slate-500 mb-2 font-semibold">FILE ÂM THANH:</p> {essay.audioFiles.map((file, idx) => ( <audio controls key={idx} src={file} className="mb-2 w-full h-8 rounded-lg" /> ))} </div> )}
+                              </div>
+                              <div className="mt-5 flex justify-end gap-3 pt-4 border-t border-slate-200">
+                                <button onClick={() => handleEdit(essay)} className="bg-amber-500 text-white py-2 px-4 rounded-md hover:bg-amber-600 text-sm font-semibold transition-colors" disabled={isSubmittingEssay}>Sửa</button>
+                                <button onClick={() => handleDelete(essay._id)} className="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 text-sm font-semibold transition-colors" disabled={isSubmittingEssay}>Xóa</button>
+                              </div>
+                          </div>
+                      );
+                  })}
                 </div>
+
+                {adminTotalPages > 1 && ( <div className="mt-10 flex justify-center items-center flex-wrap gap-2"> 
+                    <button onClick={() => handleAdminPageChange(adminCurrentPage - 1)} disabled={adminCurrentPage === 1} className="py-2 px-4 border rounded-md text-sm bg-white text-slate-700 border-slate-300 hover:bg-slate-100 disabled:opacity-50">« Trước</button> 
+                    {renderAdminPageNumbers()} 
+                    <button onClick={() => handleAdminPageChange(adminCurrentPage + 1)} disabled={adminCurrentPage === adminTotalPages} className="py-2 px-4 border rounded-md text-sm bg-white text-slate-700 border-slate-300 hover:bg-slate-100 disabled:opacity-50">Sau »</button> 
+                </div> )}
             </div>
-        </div>
-        {adminEssaysForCurrentPage.length === 0 && !loadingEssays && ( <p className="text-gray-400 text-center py-4 bg-gray-800 rounded-lg"> Không có bài luận nào {adminSearchTerm || adminSelectedTopicFilter !== 'Tất cả' || selectedAdminCategoryFilter !== 'Tất cả' ? "phù hợp với tiêu chí lọc/tìm kiếm" : "hiện có"}. </p> )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {adminEssaysForCurrentPage.map(essay => {
-            const { topicName, categoryName } = getTopicDisplayInfo(essay.topic);
-            return (
-              <div key={essay._id} className="bg-gray-800 p-5 rounded-lg shadow-lg border border-gray-700 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-xl font-semibold text-yellow-400 mb-1 truncate" title={essay.title}>{essay.title}</h3>
-                  <p className="text-sm text-blue-400 mb-1">Chuyên mục: {categoryName}</p>
-                  <p className="text-sm text-indigo-400 mb-3">Chủ đề: {topicName}</p>
-                  {essay.outline && ( <details className="mb-2 text-sm"><summary className="cursor-pointer text-gray-400 hover:text-gray-200 outline-none focus:ring-1 focus:ring-yellow-500 rounded p-1 font-medium">Xem Dàn Ý</summary><div className="mt-1 p-3 bg-gray-700/50 rounded prose prose-sm prose-invert max-w-none text-gray-300" dangerouslySetInnerHTML={{ __html: essay.outline }} /></details> )}
-                  <details className="mb-2 text-sm"> <summary className="cursor-pointer text-gray-400 hover:text-gray-200 outline-none focus:ring-1 focus:ring-yellow-500 rounded p-1 font-medium">Xem Bài luận 1 (Chính)</summary> <div className="mt-1 p-3 bg-gray-700/50 rounded prose prose-sm prose-invert max-w-none text-gray-300" dangerouslySetInnerHTML={{ __html: essay.content }} /> </details>
-                  {essay.essay2 && ( <details className="mb-2 text-sm"><summary className="cursor-pointer text-gray-400 hover:text-gray-200 outline-none focus:ring-1 focus:ring-yellow-500 rounded p-1 font-medium">Xem Bài luận 2</summary><div className="mt-1 p-3 bg-gray-700/50 rounded prose prose-sm prose-invert max-w-none text-gray-300" dangerouslySetInnerHTML={{ __html: essay.essay2 }} /></details> )}
-                  {essay.essay3 && ( <details className="mb-2 text-sm"><summary className="cursor-pointer text-gray-400 hover:text-gray-200 outline-none focus:ring-1 focus:ring-yellow-500 rounded p-1 font-medium">Xem Bài luận 3</summary><div className="mt-1 p-3 bg-gray-700/50 rounded prose prose-sm prose-invert max-w-none text-gray-300" dangerouslySetInnerHTML={{ __html: essay.essay3 }} /></details> )}
-                  {essay.audioFiles && essay.audioFiles.length > 0 && ( <div className="mt-4 pt-3 border-t border-gray-700/50"> <p className="text-xs text-gray-400 mb-2 font-semibold">File âm thanh ({essay.audioFiles.length}):</p> {essay.audioFiles.map((file, idx_audio) => ( <audio controls key={idx_audio} className="mb-2 w-full h-10 rounded-lg custom-audio-controls"> <source src={file} /> Your browser does not support the audio element. </audio> ))} </div> )}
-                </div>
-                <div className="mt-4 flex justify-end gap-3 pt-4 border-t border-gray-700">
-                  <button
-                    onClick={() => handleEdit(essay)}
-                    className="bg-blue-500 text-white py-2 px-4 rounded hover:bg-blue-600 text-sm font-semibold transition-colors shadow-md"
-                    disabled={isSubmittingEssay}
-                  > Sửa </button>
-                  <button
-                    onClick={() => handleDelete(essay._id)}
-                    className="bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 text-sm font-semibold transition-colors shadow-md"
-                    disabled={isSubmittingEssay}
-                  > Xóa </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {adminTotalPages > 1 && ( <div className="mt-10 flex justify-center items-center space-x-1"> <button onClick={() => handleAdminPageChange(adminCurrentPage - 1)} disabled={adminCurrentPage === 1} className="py-2 px-4 border rounded-md text-sm bg-[#2c2c34] text-gray-300 border-gray-600 hover:bg-gray-600 disabled:opacity-50">« Trước</button> {renderAdminPageNumbers()} <button onClick={() => handleAdminPageChange(adminCurrentPage + 1)} disabled={adminCurrentPage === adminTotalPages} className="py-2 px-4 border rounded-md text-sm bg-[#2c2c34] text-gray-300 border-gray-600 hover:bg-gray-600 disabled:opacity-50">Sau »</button> </div> )}
+        )}
       </div>
       <style>
         {`
-        .quill-dark-theme .ql-toolbar { border-color: #4A5568 !important; background-color: #2D3748 !important; border-top-left-radius: 0.375rem; border-top-right-radius: 0.375rem; }
-        .quill-dark-theme .ql-toolbar .ql-stroke, .quill-dark-theme .ql-toolbar .ql-picker-label { stroke: #E2E8F0 !important; color: #E2E8F0 !important; }
-        .quill-dark-theme .ql-toolbar .ql-fill { fill: #E2E8F0 !important; }
-        .quill-dark-theme .ql-container { border-color: #4A5568 !important; color: #E2E8F0 !important; background-color: #222730 !important; border-bottom-left-radius: 0.375rem; border-bottom-right-radius: 0.375rem; font-size: 1rem; }
-        .quill-dark-theme .ql-editor { color: #E2E8F0 !important; padding: 12px 15px !important; }
-        .quill-dark-theme .ql-editor.ql-blank::before { color: rgba(226, 232, 240, 0.5) !important; font-style: normal !important; }
-        .quill-dark-theme .ql-picker-options { background-color: #2D3748 !important; border-color: #4A5568 !important; color: #E2E8F0 !important; }
-        .quill-dark-theme .ql-picker-item { color: #E2E8F0 !important; }
-        .quill-dark-theme .ql-picker-item:hover, .quill-dark-theme .ql-picker-item.ql-selected { background-color: #4A5568 !important; color: #FFF !important; }
-        .custom-audio-controls { filter: invert(1) brightness(0.8) hue-rotate(180deg) saturate(0.5); }
-        .prose-invert { --tw-prose-body: #d1d5db; --tw-prose-headings: #ffffff; --tw-prose-lead: #9ca3af; --tw-prose-links: #fde047; --tw-prose-bold: #ffffff; --tw-prose-counters: #9ca3af; --tw-prose-bullets: #4b5563; --tw-prose-hr: #374151; --tw-prose-quotes: #e5e7eb; --tw-prose-quote-borders: #374151; --tw-prose-captions: #9ca3af; --tw-prose-code: #ffffff; --tw-prose-pre-code: #d1d5db; --tw-prose-pre-bg: #1f2937; --tw-prose-th-borders: #4b5563; --tw-prose-td-borders: #374151; }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slideDown { animation: slideDown 0.3s ease-out forwards; }
+        
+        .custom-quill-light .ql-toolbar {
+          background-color: #f8fafc;
+          border-top-left-radius: 0.375rem;
+          border-top-right-radius: 0.375rem;
+          border-color: #e2e8f0;
+        }
+        .custom-quill-light .ql-container {
+          background-color: #ffffff;
+          border-bottom-left-radius: 0.375rem;
+          border-bottom-right-radius: 0.375rem;
+          border-color: #e2e8f0;
+          color: #1e293b;
+          min-height: 150px;
+        }
+        .custom-quill-light .ql-editor {
+           font-size: 1rem;
+           line-height: 1.6;
+        }
+        .custom-quill-light .ql-editor.ql-blank::before {
+          color: #94a3b8;
+          font-style: normal;
+        }
+        .prose { color: #334155; }
+        .prose h1, .prose h2, .prose h3 { color: #1e293b; }
+        .prose a { color: #4f46e5; }
+        .prose blockquote { border-left-color: #cbd5e1; }
+        .prose code { color: #be123c; }
       `}
       </style>
     </div>
