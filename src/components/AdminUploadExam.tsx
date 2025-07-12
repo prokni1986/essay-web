@@ -1,7 +1,9 @@
-// src/components/AdminUploadExam.tsx (Đã sửa lỗi ESLint no-explicit-any)
+// src/components/AdminUploadExam.tsx
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import Papa, { ParseError } from 'papaparse';
+import axios from 'axios';
 
 // --- Import các thành phần cần thiết ---
 import axiosInstance from '@/lib/axiosInstance';
@@ -10,11 +12,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Pencil, Trash2, XCircle, Loader2, ImageIcon } from 'lucide-react';
+import { Pencil, Trash2, XCircle, Loader2, Upload } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // --- Định nghĩa kiểu dữ liệu (Interfaces) ---
+type ExamType = 'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên';
+type ExamDifficulty = 'Dễ' | 'Trung bình' | 'Khó' | 'Rất khó';
+
 interface ExamInList {
   _id: string;
   title: string;
@@ -23,18 +29,45 @@ interface ExamInList {
   year: number;
   province?: string;
   createdAt: string;
-  thumbnailUrl?: string;
-  type?: 'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên';
+  type?: ExamType;
   duration?: number;
   questions?: number;
-  difficulty?: 'Dễ' | 'Trung bình' | 'Khó' | 'Rất khó';
+  difficulty?: ExamDifficulty;
   grade?: number;
 }
 
 interface ExamFull extends ExamInList {
   htmlContent: string;
-  solutionHtml?: string; // Lời giải có thể không có
+  solutionHtml?: string;
 }
+
+interface CsvRow {
+  'Tiêu đề Đề thi': string;
+  'Mô tả ngắn': string;
+  'Môn học': string;
+  'Năm': string;
+  'Tỉnh/ Thành phố': string;
+  'Loại đề thi': string;
+  'Thời gian làm bài': string;
+  'Số Câu hỏi': string;
+  'Độ khó': string;
+  'Lớp': string;
+  'Nội dung Đề thi HTML': string;
+  'Gợi ý lời giải HTML (Tùy chọn)': string;
+}
+
+// Hàm Type Guard để chuyển đổi chuỗi sang kiểu ExamType an toàn
+const toExamType = (value: string): ExamType => {
+  const validTypes: ExamType[] = ['Chính thức', 'Thi thử', 'Đề ôn tập', 'Đề thi chuyên'];
+  return validTypes.includes(value as ExamType) ? (value as ExamType) : 'Chính thức';
+};
+
+// Hàm Type Guard để chuyển đổi chuỗi sang kiểu ExamDifficulty an toàn
+const toDifficulty = (value: string): ExamDifficulty => {
+  const validDifficulties: ExamDifficulty[] = ['Dễ', 'Trung bình', 'Khó', 'Rất khó'];
+  return validDifficulties.includes(value as ExamDifficulty) ? (value as ExamDifficulty) : 'Trung bình';
+};
+
 
 // --- Component chính ---
 const AdminUploadExam: React.FC = () => {
@@ -52,18 +85,15 @@ const AdminUploadExam: React.FC = () => {
   const [apiError, setApiError] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<ExamInList | null>(null);
   const [loadingContentId, setLoadingContentId] = useState<string | null>(null);
-  
   const [fullContentCache, setFullContentCache] = useState<{ [key: string]: { htmlContent: string; solutionHtml?: string } }>({});
-
-  // === Các state cho các trường mới ===
-  const [type, setType] = useState<'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên'>('Chính thức');
+  const [type, setType] = useState<ExamType>('Chính thức');
   const [duration, setDuration] = useState<number | ''>('');
   const [questions, setQuestions] = useState<number | ''>('');
-  const [difficulty, setDifficulty] = useState<'Dễ' | 'Trung bình' | 'Khó' | 'Rất khó'>('Trung bình');
+  const [difficulty, setDifficulty] = useState<ExamDifficulty>('Trung bình');
   const [grade, setGrade] = useState<number | ''>('');
-  
   const [solutionHtml, setSolutionHtml] = useState('');
-
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [isCsvUploading, setIsCsvUploading] = useState(false);
 
   // --- API Functions ---
   const fetchExams = useCallback(async () => {
@@ -130,7 +160,6 @@ const AdminUploadExam: React.FC = () => {
       setQuestions(fullExamData.questions || '');
       setDifficulty(fullExamData.difficulty || 'Trung bình');
       setGrade(fullExamData.grade || '');
-
       document.getElementById('exam-form-section')?.scrollIntoView({ behavior: 'smooth' });
     } catch {
       toast.error("Không thể tải nội dung chi tiết để sửa.");
@@ -143,30 +172,19 @@ const AdminUploadExam: React.FC = () => {
       toast.error("Vui lòng điền đủ các trường: Tiêu đề, Môn học, Năm và Nội dung HTML.");
       return;
     }
-
     setIsLoading(true);
-    toast.info("Đang xử lý... Quá trình tạo thumbnail có thể mất vài giây.");
-
     const examData = {
-      title,
-      description,
-      htmlContent,
-      solutionHtml,
-      subject,
-      year: Number(year),
-      province,
-      type,
+      title, description, htmlContent, solutionHtml, subject,
+      year: Number(year), province, type,
       duration: Number(duration) || undefined,
       questions: Number(questions) || undefined,
       difficulty,
       grade: Number(grade) || undefined,
     };
-
     try {
       const action = editingExam
         ? axiosInstance.put(`/api/exams/${editingExam._id}`, examData)
         : axiosInstance.post('/api/exams/create-html-post', examData);
-
       await action;
       toast.success(editingExam ? 'Cập nhật đề thi thành công!' : 'Tạo mới đề thi thành công!');
       resetForm();
@@ -210,17 +228,126 @@ const AdminUploadExam: React.FC = () => {
       }
     }
   };
-
+  
   const gradeOptions = Array.from({ length: 12 }, (_, i) => i + 1);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setCsvFile(e.target.files[0]);
+    } else {
+      setCsvFile(null);
+    }
+  };
+
+  const handleCsvUpload = async () => {
+    if (!csvFile) {
+      toast.error("Vui lòng chọn một file CSV để upload.");
+      return;
+    }
+    setIsCsvUploading(true);
+    toast.info("Đang đọc và xử lý file CSV...");
+    try {
+      const results = await new Promise<Papa.ParseResult<CsvRow>>((resolve, reject) => {
+        Papa.parse<CsvRow>(csvFile, {
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => resolve(results),
+          error: (error: Error) => reject(error),
+        });
+      });
+      
+      if (results.errors.length > 0) {
+        toast.error(`Có lỗi xảy ra khi đọc file CSV: ${results.errors[0].message}`);
+        return;
+      }
+      
+      const requiredHeaders = ['Tiêu đề Đề thi', 'Môn học', 'Năm', 'Nội dung Đề thi HTML'];
+      const headers = results.meta.fields || [];
+      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      if (missingHeaders.length > 0) {
+        toast.error(`File CSV thiếu các cột bắt buộc: ${missingHeaders.join(', ')}`);
+        return;
+      }
+      
+      const examsToCreate = results.data.map((row: CsvRow) => ({
+        title: row['Tiêu đề Đề thi']?.trim() || '',
+        description: row['Mô tả ngắn']?.trim() || '',
+        subject: row['Môn học']?.trim() || '',
+        year: row['Năm'] ? Number(row['Năm']) : undefined,
+        province: row['Tỉnh/ Thành phố']?.trim() || '',
+        type: toExamType(row['Loại đề thi']?.trim()),
+        duration: row['Thời gian làm bài'] ? Number(row['Thời gian làm bài']) : undefined,
+        questions: row['Số Câu hỏi'] ? Number(row['Số Câu hỏi']) : undefined,
+        difficulty: toDifficulty(row['Độ khó']?.trim()),
+        grade: row['Lớp'] ? Number(row['Lớp']) : undefined,
+        htmlContent: row['Nội dung Đề thi HTML']?.trim() || '',
+        solutionHtml: row['Gợi ý lời giải HTML (Tùy chọn)']?.trim() || '',
+      })).filter(exam => exam.title && exam.subject && exam.year && exam.htmlContent);
+
+      if (examsToCreate.length === 0) {
+        toast.warning("Không tìm thấy dữ liệu đề thi hợp lệ trong file CSV.");
+        return;
+      }
+
+      toast.info(`Đã tìm thấy ${examsToCreate.length} đề thi. Bắt đầu upload...`);
+      const response = await axiosInstance.post('/api/exams/create-bulk-csv', examsToCreate);
+      toast.success(response.data.message || 'Upload hàng loạt thành công!');
+      await fetchExams();
+      setCsvFile(null);
+      const fileInput = document.getElementById('csv-file') as HTMLInputElement;
+      if(fileInput) fileInput.value = '';
+
+    } catch (error: unknown) {
+      console.error("Lỗi khi upload CSV:", error);
+      let errorMessage = "Upload hàng loạt thất bại. Vui lòng kiểm tra console log.";
+      if (axios.isAxiosError(error) && error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      toast.error(errorMessage);
+    } finally {
+      setIsCsvUploading(false);
+    }
+  };
 
   // --- Render ---
   return (
     <Layout>
       <main className="container mx-auto px-4 py-8 md:py-12">
+        
+        <section className="mb-16">
+           <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Upload className="h-6 w-6" />
+                Upload Hàng Loạt Bằng File CSV
+              </CardTitle>
+              <CardDescription>
+                Tải lên nhiều đề thi cùng lúc bằng cách sử dụng file .csv. File phải có header trùng với các trường dữ liệu.
+                <br/>
+                Các cột bắt buộc: <strong>Tiêu đề Đề thi, Môn học, Năm, Nội dung Đề thi HTML</strong>.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid w-full max-w-sm items-center gap-1.5">
+                <Label htmlFor="csv-file">Chọn file CSV</Label>
+                <Input id="csv-file" type="file" accept=".csv" onChange={handleFileChange} />
+              </div>
+              <Button onClick={handleCsvUpload} disabled={isCsvUploading || !csvFile} className="mt-4">
+                {isCsvUploading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isCsvUploading ? 'Đang Upload...' : 'Bắt đầu Upload'}
+              </Button>
+            </CardContent>
+           </Card>
+        </section>
+
+        <div className="my-12 border-t border-dashed"></div>
+
         <section id="exam-form-section" className="mb-16">
           <header className="mb-8">
             <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">
-              {editingExam ? 'Chỉnh Sửa Đề Thi' : 'Tạo Đề Thi Mới'}
+              {editingExam ? 'Chỉnh Sửa Đề Thi Thủ Công' : 'Tạo Đề Thi Mới Thủ Công'}
             </h1>
             <p className="text-lg text-muted-foreground">
               Điền thông tin, nội dung HTML của đề thi và lời giải vào biểu mẫu bên dưới.
@@ -253,8 +380,7 @@ const AdminUploadExam: React.FC = () => {
 
               <div>
                 <Label htmlFor="type">Loại đề thi</Label>
-                {/* SỬA LỖI 1: Thay 'any' bằng union type cụ thể */}
-                <Select value={type} onValueChange={(value) => setType(value as 'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên')}>
+                <Select value={type} onValueChange={(value) => setType(value as ExamType)}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Chọn loại đề" />
                   </SelectTrigger>
@@ -276,8 +402,7 @@ const AdminUploadExam: React.FC = () => {
               </div>
               <div>
                 <Label htmlFor="difficulty">Độ khó</Label>
-                {/* SỬA LỖI 2: Thay 'any' bằng union type cụ thể */}
-                <Select value={difficulty} onValueChange={(value) => setDifficulty(value as 'Dễ' | 'Trung bình' | 'Khó' | 'Rất khó')}>
+                <Select value={difficulty} onValueChange={(value) => setDifficulty(value as ExamDifficulty)}>
                   <SelectTrigger className="mt-1">
                     <SelectValue placeholder="Chọn độ khó" />
                   </SelectTrigger>
@@ -347,19 +472,8 @@ const AdminUploadExam: React.FC = () => {
                     <AccordionItem key={exam._id} value={exam._id} className="bg-card border rounded-lg" onClick={() => handleToggleDetails(exam._id)}>
                       <AccordionTrigger className="p-4 hover:no-underline hover:bg-muted/50 rounded-t-lg data-[state=open]:rounded-b-none">
                         <div className="flex flex-col md:flex-row items-start md:items-center flex-1 text-left">
-                          {exam.thumbnailUrl ? (
-                            <img
-                              src={exam.thumbnailUrl}
-                              alt={`Thumbnail for ${exam.title}`}
-                              className="w-24 h-auto object-cover rounded-md mr-4 mb-2 md:mb-0"
-                              onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/placeholder.png'; }}
-                            />
-                          ) : (
-                            <div className="w-24 h-auto flex items-center justify-center bg-muted rounded-md mr-4 mb-2 md:mb-0">
-                                <ImageIcon className="h-10 w-10 text-muted-foreground" />
-                            </div>
-                          )}
-                          <div>
+                          {/* BỎ KHỐI HIỂN THỊ THUMBNAIL */}
+                          <div className="flex-1">
                             <h3 className="font-semibold text-foreground text-lg">{exam.title}</h3>
                             <p className="text-sm text-muted-foreground">
                                 {exam.subject} ({exam.year}) - {exam.province || 'Không rõ'}

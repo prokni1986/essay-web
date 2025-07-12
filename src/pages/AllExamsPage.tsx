@@ -1,11 +1,10 @@
-// src/pages/AllExamsPage.tsx (Đã cập nhật màu sắc Badge cho 4 loại đề thi)
+// src/pages/AllExamsPage.tsx
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import axiosInstance from '../lib/axiosInstance';
-import { Link, useLocation } from 'react-router-dom'; // Import useLocation
+import { Link, useLocation } from 'react-router-dom';
 import Layout from '@/components/Layout';
-import { toast } from 'sonner';
 import Breadcrumbs, { BreadcrumbItem } from '@/components/Breadcrumbs';
 
 // UI components và icons
@@ -17,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, Download, Clock, FileText, CalendarDays, BarChart3, Loader2, Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
-// Interface cho đề thi
+// Interface cho đề thi (đã xóa thumbnailUrl)
 interface ExamInList {
   _id: string;
   title: string;
@@ -26,8 +25,7 @@ interface ExamInList {
   year?: number;
   province?: string;
   createdAt: string;
-  thumbnailUrl?: string;
-  type?: 'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên'; // Đảm bảo interface có đủ các loại
+  type?: 'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên';
   duration?: number;
   questions?: number;
   difficulty?: 'Dễ' | 'Trung bình' | 'Khó' | 'Rất khó';
@@ -38,7 +36,7 @@ interface ApiErrorResponse {
   message?: string;
 }
 
-// Hàm helper để lấy màu nền cho Badge Subject (giữ nguyên)
+// Hàm helper để lấy màu nền cho Badge Subject
 const getSubjectBadgeColorClass = (subject: string | undefined): string => {
   switch (subject) {
     case 'Toán':
@@ -52,32 +50,86 @@ const getSubjectBadgeColorClass = (subject: string | undefined): string => {
   }
 };
 
-// === HÀM HELPER MỚI: Lấy màu nền và màu chữ cho Badge Type ===
+// Hàm helper để lấy màu nền cho Badge Type
 const getTypeBadgeClasses = (type: 'Chính thức' | 'Thi thử' | 'Đề ôn tập' | 'Đề thi chuyên' | undefined): string => {
   switch (type) {
     case 'Chính thức':
-      return 'bg-purple-400 text-white'; // Màu tím đậm, chữ trắng
+      return 'bg-purple-400 text-white';
     case 'Thi thử':
-      return 'bg-orange-400 text-white'; // Màu cam, chữ trắng
+      return 'bg-orange-400 text-white';
     case 'Đề ôn tập':
-      return 'bg-teal-400 text-white';    // Màu xanh mòng két, chữ trắng
+      return 'bg-teal-400 text-white';
     case 'Đề thi chuyên':
-      return 'bg-red-400 text-white';     // Màu đỏ đậm, chữ trắng
+      return 'bg-red-400 text-white';
     default:
-      return 'bg-gray-400 text-white';    // Mặc định, màu xám đậm, chữ trắng
+      return 'bg-gray-400 text-white';
   }
 };
+
+// === HÀM HELPER MỚI: Lấy đường dẫn ảnh thumbnail động ===
+const getThumbnailForExam = (exam: ExamInList): string => {
+  // Ưu tiên kiểm tra đề chuyên trước
+  if (exam.type === 'Đề thi chuyên') {
+    switch (exam.subject) {
+      case 'Toán':
+        return '/uploads/Ảnh thumbnail/chuyên toán.png';
+      case 'Ngữ văn':
+        return '/uploads/Ảnh thumbnail/chuyên văn.png';
+      case 'Tiếng Anh':
+        return '/uploads/Ảnh thumbnail/chuyên anh.png';
+      default:
+        // Ảnh mặc định cho các môn chuyên khác (Lý, Hóa, Sinh,...)
+        return '/uploads/Ảnh thumbnail/chuyen_default.png';
+    }
+  }
+  if (exam.type === 'Chính thức') {
+    switch (exam.subject) {
+      case 'Toán':
+        return '/uploads/Ảnh thumbnail/đề thi toán.png';
+      case 'Ngữ văn':
+        return '/uploads/Ảnh thumbnail/đề thi văn.png';
+      case 'Tiếng Anh':
+        return '/uploads/Ảnh thumbnail/đề thi anh.png';
+      default:
+        return '/uploads/Ảnh thumbnail/chinhthuc_default.png';
+    }
+  }
+  if (exam.type === 'Thi thử') {
+    // Với đề thi thử, ta có thể dùng ảnh chung hoặc phân loại theo môn nếu muốn
+    switch (exam.subject) {
+      case 'Toán':
+        return '/uploads/Ảnh thumbnail/đề thi thử.png';
+      case 'Ngữ văn':
+        return '/uploads/Ảnh thumbnail/đề thi thử.png';
+      case 'Tiếng Anh':
+          return '/uploads/Ảnh thumbnail/đề thi thử.png';
+      default:
+        // Ảnh chung cho các đề thi thử
+        return '/uploads/Ảnh thumbnail/thithu_default.png';
+    }
+  }
+  if (exam.type === 'Đề ôn tập') {
+    // Đề ôn tập thường dùng ảnh chung
+    return '/uploads/Ảnh thumbnail/ontap.png';
+  }
+  // Fallback: Trả về một ảnh mặc định cho tất cả các trường hợp còn lại
+  return '/uploads/Ảnh thumbnail/default.png';
+};
+
 
 
 // Component ExamCard chi tiết
 const ExamCard: React.FC<{ exam: ExamInList }> = ({ exam }) => {
   const placeholderOnError = "https://via.placeholder.com/400x225/1f2937/4d5562?text=Không có ảnh";
 
+  // Lấy đường dẫn ảnh thumbnail động
+  const thumbnailUrl = getThumbnailForExam(exam);
+
   return (
     <div className="bg-card text-card-foreground rounded-lg shadow-md border overflow-hidden flex flex-col group">
       <Link to={`/exam/${exam._id}`} className="block h-40 bg-muted overflow-hidden border-b border-border">
         <img
-          src={exam.thumbnailUrl || placeholderOnError}
+          src={thumbnailUrl} // <-- SỬ DỤNG LOGIC MỚI
           alt={`Ảnh minh họa cho ${exam.title}`}
           loading="lazy"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -86,15 +138,13 @@ const ExamCard: React.FC<{ exam: ExamInList }> = ({ exam }) => {
       </Link>
       <div className="p-3 flex flex-col flex-grow">
         <div className="flex justify-between items-center mb-3">
-          {/* Hiển thị Môn học với màu nền động và chữ đen */}
           {exam.subject && (
             <Badge variant="default" className={`${getSubjectBadgeColorClass(exam.subject)} text-black text-xs px-1.5 py-0.5 rounded-full`}>
               {exam.subject}
             </Badge>
           )}
-          {/* Hiển thị Loại đề thi với màu nền và màu chữ động */}
           {exam.type && (
-            <Badge variant="default" // Có thể dùng "default" nếu màu được kiểm soát hoàn toàn bởi className
+            <Badge variant="default"
                    className={`${getTypeBadgeClasses(exam.type)} text-xs px-1.5 py-0.5 rounded-full`}>
               {exam.type}
             </Badge>
@@ -142,7 +192,7 @@ const AllExamsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // === State cho bộ lọc ===
+  // State cho bộ lọc
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [selectedGrades, setSelectedGrades] = useState<number[]>([]);
   const [selectedDifficulties, setSelectedDifficulties] = useState<string[]>([]);
@@ -154,11 +204,11 @@ const AllExamsPage: React.FC = () => {
   const queryParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
 
 
-  // === State cho phân trang của từng môn học ===
+  // State cho phân trang của từng môn học
   const [subjectCurrentPages, setSubjectCurrentPages] = useState<{ [subject: string]: number }>({});
-  const ITEMS_PER_ROW = 3; // Số đề thi trên mỗi hàng (từ grid lg:grid-cols-3)
-  const MAX_ROWS_PER_PAGE = 2; // Số hàng tối đa hiển thị
-  const ITEMS_PER_PAGE_PER_SUBJECT = ITEMS_PER_ROW * MAX_ROWS_PER_PAGE; // 6 đề thi mỗi trang của một môn
+  const ITEMS_PER_ROW = 3; 
+  const MAX_ROWS_PER_PAGE = 2; 
+  const ITEMS_PER_PAGE_PER_SUBJECT = ITEMS_PER_ROW * MAX_ROWS_PER_PAGE;
 
   const allSubjects = useMemo(() => Array.from(new Set(exams.map(e => e.subject).filter(Boolean) as string[])), [exams]);
   const allGrades = useMemo(() => Array.from(new Set(exams.map(e => e.grade).filter(Boolean) as number[])).sort((a,b)=>a-b), [exams]);
@@ -174,7 +224,7 @@ const AllExamsPage: React.FC = () => {
     if (initialGradeParam) {
       setSelectedGrades([parseInt(initialGradeParam, 10)]);
     } else {
-      setSelectedGrades([]); // Ensure no grade is pre-selected if param is absent
+      setSelectedGrades([]);
     }
 
     const fetchExams = async () => {
@@ -195,9 +245,9 @@ const AllExamsPage: React.FC = () => {
       }
     };
     fetchExams();
-  }, [queryParams]); // Re-run effect if queryParams change
+  }, [queryParams]);
 
-  // Hàm lọc đề thi dựa trên các bộ lọc đã chọn (Giữ nguyên)
+  // Hàm lọc đề thi dựa trên các bộ lọc đã chọn
   const filteredExams = useMemo(() => {
     return exams.filter(exam => {
       const matchesSubject = selectedSubjects.length === 0 || (exam.subject && selectedSubjects.includes(exam.subject));
@@ -255,7 +305,7 @@ const AllExamsPage: React.FC = () => {
     return groups;
   }, [filteredExams, subjectCurrentPages, ITEMS_PER_PAGE_PER_SUBJECT]);
 
-  // Hàm thay đổi trang cho một môn học cụ thể (Giữ nguyên)
+  // Hàm thay đổi trang cho một môn học cụ thể
   const handleSubjectPageChange = (subject: string, newPage: number) => {
     setSubjectCurrentPages(prev => ({
       ...prev,
@@ -292,7 +342,7 @@ const AllExamsPage: React.FC = () => {
     
     const gradeParam = queryParams.get('grade');
     if (gradeParam) {
-      items.push({ label: `Lớp ${gradeParam}` }); // No path needed here
+      items.push({ label: `Lớp ${gradeParam}` });
     }
   
     return items;
@@ -303,7 +353,6 @@ const AllExamsPage: React.FC = () => {
       <div className="bg-background text-foreground min-h-screen">
         <div className="container mx-auto px-4 py-8">
           <header className="mb-8">
-            {/* Thêm Breadcrumbs tại đây */}
             <div className="mb-4">
               <Breadcrumbs items={breadcrumbItems} />
             </div>
@@ -438,7 +487,6 @@ const AllExamsPage: React.FC = () => {
                   <Button variant="outline" size="sm" onClick={() => handleQuickSearchBySubject("Toán")}>Toán</Button>
                   <Button variant="outline" size="sm" onClick={() => handleQuickSearchBySubject("Ngữ văn")}>Ngữ văn</Button>
                   <Button variant="outline" size="sm" onClick={() => handleQuickSearchBySubject("Tiếng Anh")}>Tiếng Anh</Button>
-                  {/* NÚT "HIỂN THỊ TẤT CẢ" MỚI */}
                   <Button variant="default" size="sm" onClick={handleShowAll}>Hiển thị tất cả</Button>
                 </div>
               </div>
@@ -461,7 +509,7 @@ const AllExamsPage: React.FC = () => {
                           ))}
                         </div>
 
-                        {/* === PHẦN PHÂN TRANG CHO TỪNG MÔN HỌC === */}
+                        {/* PHẦN PHÂN TRANG CHO TỪNG MÔN HỌC */}
                         {group.totalPages > 1 && (
                           <div className="flex justify-center items-center mt-6 space-x-2">
                             <Button
@@ -473,7 +521,6 @@ const AllExamsPage: React.FC = () => {
                               <ChevronLeft size={20} />
                             </Button>
                             
-                            {/* Hiển thị các nút số trang */}
                             {Array.from({ length: group.totalPages }, (_, i) => i + 1).map(pageNumber => (
                               <Button
                                 key={pageNumber}
@@ -496,7 +543,6 @@ const AllExamsPage: React.FC = () => {
                             </Button>
                           </div>
                         )}
-                        {/* === KẾT THÚC PHẦN PHÂN TRANG CHO TỪNG MÔN HỌC === */}
                       </div>
                     ))
                   ) : (

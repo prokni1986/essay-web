@@ -222,7 +222,7 @@ const Header: React.FC = () => {
           <div className="flex items-center">
             <Link to="/" className="text-2xl font-bold text-primary">
               <i className="fas fa-book-open mr-2"></i>
-              EduViet
+              OnthiHub
             </Link>
           </div>
 

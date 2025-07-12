@@ -6,22 +6,20 @@ const ExamSchema = new mongoose.Schema({
   title: { type: String, required: [true, "Tiêu đề là bắt buộc."] },
   description: { type: String },
   htmlContent: { type: String, required: [true, "Nội dung HTML là bắt buộc."] },
-  
-  // MỚI: Thêm trường cho gợi ý lời giải dưới dạng HTML
   solutionHtml: { 
     type: String, 
-    required: false // Lời giải có thể được cập nhật sau, nên không bắt buộc
+    required: false
   },
-
   subject: { type: String, required: true },
   year: { type: Number, required: true },
   province: { type: String },
   topic: { type: mongoose.Schema.Types.ObjectId, ref: 'Topic' },
   
-  thumbnailUrl: {
-    type: String, 
-    required: false,
-  },
+  // ĐÃ BỎ TRƯỜNG NÀY
+  // thumbnailUrl: {
+  //   type: String, 
+  //   required: false,
+  // },
 
   type: { 
     type: String,
