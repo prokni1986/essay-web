@@ -72,48 +72,48 @@ const getThumbnailForExam = (exam: ExamInList): string => {
   if (exam.type === 'Đề thi chuyên') {
     switch (exam.subject) {
       case 'Toán':
-        return '/uploads/Ảnh thumbnail/chuyên toán.png';
+        return '/uploads/thumbnail/chuyentoan.png';
       case 'Ngữ văn':
-        return '/uploads/Ảnh thumbnail/chuyên văn.png';
+        return '/uploads/thumbnail/chuyenvan.png';
       case 'Tiếng Anh':
-        return '/uploads/Ảnh thumbnail/chuyên anh.png';
+        return '/uploads/thumbnail/chuyenanh.png';
       default:
         // Ảnh mặc định cho các môn chuyên khác (Lý, Hóa, Sinh,...)
-        return '/uploads/Ảnh thumbnail/chuyen_default.png';
+        return '/uploads/thumbnail/chuyen_default.png';
     }
   }
   if (exam.type === 'Chính thức') {
     switch (exam.subject) {
       case 'Toán':
-        return '/uploads/Ảnh thumbnail/đề thi toán.png';
+        return '/uploads/thumbnail/dethitoan.png';
       case 'Ngữ văn':
-        return '/uploads/Ảnh thumbnail/đề thi văn.png';
-      case 'Tiếng Anh':
-        return '/uploads/Ảnh thumbnail/đề thi anh.png';
+        return '/uploads/thumbnail/dethivan.png';
+      case 'Tiếng anh':
+        return '/uploads/thumbnail/dethianh.png';
       default:
-        return '/uploads/Ảnh thumbnail/chinhthuc_default.png';
+        return '/uploads/thumbnail/chinhthuc_default.png';
     }
   }
   if (exam.type === 'Thi thử') {
     // Với đề thi thử, ta có thể dùng ảnh chung hoặc phân loại theo môn nếu muốn
     switch (exam.subject) {
       case 'Toán':
-        return '/uploads/Ảnh thumbnail/đề thi thử.png';
+        return '/uploads/thumbnail/dethithu.png';
       case 'Ngữ văn':
-        return '/uploads/Ảnh thumbnail/đề thi thử.png';
+        return '/uploads/thumbnail/dethithu.png';
       case 'Tiếng Anh':
-          return '/uploads/Ảnh thumbnail/đề thi thử.png';
+          return '/uploads/thumbnail/dethithu.png';
       default:
         // Ảnh chung cho các đề thi thử
-        return '/uploads/Ảnh thumbnail/thithu_default.png';
+        return '/uploads/thumbnail/thithu_default.png';
     }
   }
   if (exam.type === 'Đề ôn tập') {
     // Đề ôn tập thường dùng ảnh chung
-    return '/uploads/Ảnh thumbnail/ontap.png';
+    return '/uploads/thumbnail/deontap.png';
   }
   // Fallback: Trả về một ảnh mặc định cho tất cả các trường hợp còn lại
-  return '/uploads/Ảnh thumbnail/default.png';
+  return '/uploads/thumbnail/default.png';
 };
 
 

@@ -1,48 +1,57 @@
 // src/pages/LectureDetailPage.tsx
+
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
-import axiosInstance from '@/lib/axiosInstance';
 import Layout from '@/components/Layout';
 import Breadcrumbs, { BreadcrumbItem } from '@/components/Breadcrumbs';
+import axiosInstance from '../lib/axiosInstance';
+import DOMPurify from 'dompurify';
 
-// Interfaces cho dữ liệu bài giảng
-interface ILectureDetail {
+import './LectureDetailPage.css';
+
+interface LectureDetail {
   _id: string;
   name: string;
   description?: string;
   imageUrl?: string;
-  videoUrl?: string; // URL của video bài giảng
-  content: string; // Nội dung HTML của bài giảng
-  lectureCategory: { _id: string; name: string; description?: string };
+  videoUrl?: string;
+  content: string;
+  lectureCategory: {
+    _id: string;
+    name: string;
+    description?: string;
+  };
   grade: number;
   createdAt: string;
+  updatedAt: string;
 }
 
 const LectureDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
-  const [lecture, setLecture] = useState<ILectureDetail | null>(null);
+  const { slug } = useParams<{ slug: string }>(); // Sửa từ 'id' sang 'slug'
+  const [lecture, setLecture] = useState<LectureDetail | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    document.title = lecture ? `${lecture.name} - Bài giảng` : "Đang tải bài giảng...";
+    document.title = lecture?.name ? `${lecture.name} - Bài giảng` : "Chi tiết bài giảng";
     window.scrollTo(0, 0);
 
     const fetchLecture = async () => {
-      if (!id) {
+      if (!slug) { // Sử dụng 'slug'
         setLoading(false);
-        setError("Không tìm thấy ID bài giảng.");
+        setError("Không tìm thấy slug bài giảng.");
         return;
       }
       
       try {
         setLoading(true);
-        const response = await axiosInstance.get<ILectureDetail>(`/api/lectures/${id}`);
+        // Cập nhật API endpoint để gọi bằng slug
+        const response = await axiosInstance.get(`/api/lectures/slug/${slug}`); 
         setLecture(response.data);
       } catch (err) {
         if (axios.isAxiosError(err) && err.response?.status === 404) {
-          setError("Bài giảng bạn tìm không tồn tại hoặc chưa được xuất bản.");
+          setError("Bài giảng bạn tìm không tồn tại.");
         } else {
           setError('Không thể tải bài giảng. Vui lòng thử lại sau.');
         }
@@ -53,15 +62,15 @@ const LectureDetailPage: React.FC = () => {
     };
 
     fetchLecture();
-  }, [id, lecture?.name]); // Thêm lecture?.name vào dependency để cập nhật title
+  }, [slug, lecture?.name]); // Cập nhật dependency array
 
   const breadcrumbItems: BreadcrumbItem[] = useMemo(() => {
     const items: BreadcrumbItem[] = [
       { label: 'Trang chủ', path: '/' },
-      { label: 'Bài giảng', path: '/lectures' },
+      { label: 'Bài giảng & Văn mẫu', path: '/mon-ngu-van' },
     ];
     if (lecture) {
-      items.push({ label: lecture.name }); // Mục cuối cùng không có path
+      items.push({ label: lecture.name });
     }
     return items;
   }, [lecture]);
@@ -69,7 +78,7 @@ const LectureDetailPage: React.FC = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="text-center py-20 text-foreground">Đang tải bài giảng...</div>
+        <div className="detail-status-message text-center py-10">Đang tải bài giảng...</div>
       </Layout>
     );
   }
@@ -77,7 +86,7 @@ const LectureDetailPage: React.FC = () => {
   if (error) {
     return (
       <Layout>
-        <div className="text-center py-20 text-destructive">{error}</div>
+        <div className="detail-status-message error text-center py-10 text-red-500">{error}</div>
       </Layout>
     );
   }
@@ -85,77 +94,84 @@ const LectureDetailPage: React.FC = () => {
   if (!lecture) {
     return (
       <Layout>
-        <div className="text-center py-20 text-muted-foreground">Không tìm thấy dữ liệu bài giảng.</div>
+        <div className="detail-status-message text-center py-10">Không tìm thấy dữ liệu bài giảng.</div>
       </Layout>
     );
   }
 
+  const sanitizedContent = DOMPurify.sanitize(lecture.content);
+
   return (
     <Layout>
       <div className="bg-background text-foreground min-h-screen">
+        {/* Breadcrumbs Section */}
         <section className="bg-secondary/50 py-4 border-b border-border">
-          <div className="container mx-auto px-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <Breadcrumbs items={breadcrumbItems} />
           </div>
         </section>
 
-        <div className="container mx-auto px-4 py-8 md:py-12">
-          <article className="bg-card rounded-lg shadow-sm border p-6 md:p-8">
-            <header className="mb-6 pb-4 border-b border-border">
-              <h1 className="text-3xl md:text-4xl font-bold text-foreground leading-tight mb-2">
-                {lecture.name}
-              </h1>
-              <div className="text-sm text-muted-foreground flex flex-wrap gap-2 items-center">
-                <span>Chuyên mục: 
-                  <Link to={`/lecture-category/${lecture.lectureCategory._id}`} className="text-primary hover:underline ml-1">
-                    {lecture.lectureCategory.name}
-                  </Link>
-                </span>
-                <span className="mx-2">•</span>
-                <span>Lớp: <strong className="text-foreground">{lecture.grade}</strong></span>
-                <span className="mx-2">•</span>
-                <span>Ngày đăng: {new Date(lecture.createdAt).toLocaleDateString('vi-VN')}</span>
-              </div>
-            </header>
-
-            {lecture.imageUrl && (
-              <img
-                src={lecture.imageUrl}
-                alt={lecture.name}
-                className="w-full h-auto max-h-[400px] object-cover rounded-lg mb-6 shadow-md"
-              />
-            )}
-
-            {lecture.videoUrl && (
-              <div className="mb-6 aspect-video w-full max-w-full mx-auto">
-                {/* Đây là phần nhúng video. Cần đảm bảo URL là hợp lệ để nhúng. */}
-                {/* Ví dụ cho YouTube: https://www.youtube.com/embed/VIDEO_ID */}
-                {/* Cần kiểm tra xem URL có phải là nhúng trực tiếp được không. */}
-                {/* Có thể cần thư viện như react-player hoặc tự xử lý URL */}
-                <iframe
-                  className="w-full h-full rounded-lg shadow-lg"
-                  src={lecture.videoUrl.includes("youtube.com/watch") ? lecture.videoUrl.replace("watch?v=", "embed/") : lecture.videoUrl}
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  title={lecture.name}
-                ></iframe>
-              </div>
-            )}
-
-            {lecture.description && (
-                <div className="bg-muted/30 p-4 rounded-lg border border-border mb-6">
-                    <h3 className="text-lg font-semibold text-foreground mb-2">Giới thiệu</h3>
-                    <p className="text-muted-foreground">{lecture.description}</p>
+        {/* Main Content Area */}
+        <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          {/* SECTION BỌC TIÊU ĐỀ, TÓM TẮT VÀ NỘI DUNG CHÍNH */}
+          <section className="mb-16 bg-card rounded-xl shadow-xl border border-border overflow-hidden">
+            {/* KHỐI HEADER MỚI VỚI MÀU NỀN VÀ PADDING GIỐNG SAMPLEESSAY */}
+            <div className="bg-primary p-6 sm:p-8 flex flex-col justify-between items-start rounded-t-xl">
+                <h1 className="text-primary-foreground mb-2 text-2xl font-bold">
+                    {lecture.name}
+                </h1>
+                {lecture.description && (
+                    <p className="text-primary-foreground/90 text-base mb-4">
+                        {lecture.description}
+                    </p>
+                )}
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                    {lecture.lectureCategory && (
+                        <span className="inline-flex items-center rounded-full bg-primary-foreground/20 px-3 py-1 text-xs font-semibold text-primary-foreground">
+                            Chuyên mục: {lecture.lectureCategory.name}
+                        </span>
+                    )}
+                    {typeof lecture.grade === 'number' && (
+                        <span className="inline-flex items-center rounded-full bg-primary-foreground/20 px-3 py-1 text-xs font-semibold text-primary-foreground">
+                            Lớp: {lecture.grade}
+                        </span>
+                    )}
+                    {lecture.createdAt && (
+                        <span className="text-sm text-primary-foreground/70">
+                            Ngày đăng: {new Date(lecture.createdAt).toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </span>
+                    )}
                 </div>
-            )}
+            </div>
 
-            <div
-              className="prose dark:prose-invert max-w-none text-foreground leading-relaxed text-justify"
-              dangerouslySetInnerHTML={{ __html: lecture.content }}
-            />
-          </article>
-        </div>
+            {/* NỘI DUNG CHÍNH CỦA BÀI GIẢNG - Thêm padding trực tiếp vào article hoặc div chứa content */}
+            <article className="lecture-article p-4 sm:p-6">
+              {lecture.videoUrl && (
+                <div className="video-container mb-8 aspect-video w-full max-w-4xl mx-auto rounded-lg overflow-hidden shadow-lg">
+                  {/* Sử dụng regex đơn giản hơn để chuyển đổi YouTube watch URL sang embed URL */}
+                  <iframe
+                    src={lecture.videoUrl.replace(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com|youtu\.be)\/(?:watch\?v=|embed\/|v\/|)([\w-]{11})(.*)?/g, (match, p1) => `http://googleusercontent.com/youtube.com/8{p1}`)}
+                    title={lecture.name}
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    className="w-full h-full"
+                  ></iframe>
+                </div>
+              )}
+
+              {/* Dòng này không cần thêm padding nữa vì đã thêm vào article cha */}
+              <div 
+                className="article-content px-9" 
+                dangerouslySetInnerHTML={{ __html: sanitizedContent }} 
+              />
+
+              <footer className="article-footer mt-12 pt-8 border-t border-border text-muted-foreground text-sm">
+                  <p>Cập nhật lần cuối: {new Date(lecture.updatedAt).toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+              </footer>
+            </article>
+          </section>
+        </main>
       </div>
     </Layout>
   );

@@ -1,6 +1,6 @@
 // src/pages/LecturesPage.tsx
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Layout from "@/components/Layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -53,6 +53,7 @@ const FilterCheckbox: React.FC<{ id: string; label: string }> = ({ id, label }) 
 // --- Interfaces for LECTURES (Bài giảng) ---
 interface LectureCardProps {
   _id: string;
+  slug: string; // <<<< THÊM TRƯỜNG NÀY
   imgSrc?: string;
   altText: string;
   lectureCategory: string;
@@ -62,7 +63,8 @@ interface LectureCardProps {
 }
 
 const LectureCard: React.FC<LectureCardProps> = (props) => (
-  <Link to={`/lectures/${props._id}`} className="block">
+  // THAY ĐỔI ĐƯỜNG DẪN Ở ĐÂY
+  <Link to={`/mon-ngu-van/${props.slug}`} className="block">
     <Card className="group overflow-hidden transform transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
       <CardHeader className="p-0">
         <div className="relative h-52 overflow-hidden">
@@ -95,20 +97,18 @@ interface ILectureCategory {
 interface ILecture {
   _id: string;
   name: string;
+  slug: string; // <<<< THÊM TRƯỜNG NÀY
   imageUrl?: string;
   description?: string;
-  lectureCategory: {
-    _id: string;
-    name: string;
-    description?: string;
-  };
+  lectureCategory: string | ILectureCategory; // Đã sửa kiểu ở đây
   grade: number;
 }
 
-interface ILectureCategoryWithLectures extends ILectureCategory {
-  lectures: ILecture[];
-  currentPage: number;
-}
+// KHÔNG CẦN INTERFACE NÀY NỮA VÌ CHÚNG TA KHÔNG NHÓM THEO CATEGORY
+// interface ILectureCategoryWithLectures extends ILectureCategory {
+//   lectures: ILecture[];
+//   currentPage: number;
+// }
 
 // --- Interfaces for ESSAY TOPICS (Bài văn mẫu / Chủ đề luận) ---
 interface EssayTopicItem {
@@ -116,7 +116,7 @@ interface EssayTopicItem {
   name: string;
   imageUrl?: string;
   description?: string;
-  category?: string | { _id: string; name: string; description?: string }; // 'category' có thể là ID hoặc object
+  category?: string | { _id: string; name: string; }; // 'category' có thể là ID hoặc object
 }
 
 interface EssayCategory { // Category cho Essay Topics
@@ -142,7 +142,7 @@ const EssayTopicCard: React.FC<{ topic: EssayTopicItem }> = ({ topic }) => {
         {topic.imageUrl ? (
           <img src={topic.imageUrl} alt={topic.name} className="object-cover w-full h-full" />
         ) : (
-          <svg className="w-16 h-16 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+          <svg className="w-16 h-16 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
         )}
       </div>
       <h3 className="text-2xl font-bold mb-2 text-foreground text-left w-full group-hover:text-primary transition-colors">
@@ -161,7 +161,8 @@ const EssayTopicCard: React.FC<{ topic: EssayTopicItem }> = ({ topic }) => {
 
 const LecturesPage: React.FC = () => {
   // State for LECTURES (Bài giảng)
-  const [categoriesWithLectures, setCategoriesWithLectures] = useState<ILectureCategoryWithLectures[]>([]);
+  const [allLectures, setAllLectures] = useState<ILecture[]>([]); // Sửa từ categoriesWithLectures
+  const [currentLecturePage, setCurrentLecturePage] = useState(1); // Thêm state cho page bài giảng
   const [isLoadingLectures, setIsLoadingLectures] = useState(true);
   const [errorLectures, setErrorLectures] = useState<string | null>(null);
   const [selectedGrades, setSelectedGrades] = useState<number[]>([]);
@@ -185,26 +186,33 @@ const LecturesPage: React.FC = () => {
       setIsLoadingLectures(true);
       setErrorLectures(null);
       try {
+        // Chúng ta vẫn cần lectureCategories để populate lectureCategory trong ILecture
         const [lectureCategoriesRes, lecturesRes] = await Promise.all([
           axiosInstance.get<ILectureCategory[]>('/api/lecturecategories'),
           axiosInstance.get<ILecture[]>('/api/lectures')
         ]);
 
         const lectureCategories: ILectureCategory[] = lectureCategoriesRes.data;
-        const allLectures: ILecture[] = lecturesRes.data;
+        let fetchedLectures: ILecture[] = lecturesRes.data;
+
+        // Populate lectureCategory objects for display
+        fetchedLectures = fetchedLectures.map(lecture => {
+          const categoryId = typeof lecture.lectureCategory === 'object' ? lecture.lectureCategory._id : lecture.lectureCategory;
+          const foundCategory = lectureCategories.find(cat => cat._id === categoryId);
+          return {
+            ...lecture,
+            lectureCategory: foundCategory || lecture.lectureCategory // Keep original if not found (e.g., it's already an object)
+          };
+        });
+
 
         const filteredLectures = selectedGrades.length > 0
-          ? allLectures.filter(lecture => selectedGrades.includes(lecture.grade))
-          : allLectures;
+          ? fetchedLectures.filter(lecture => selectedGrades.includes(lecture.grade))
+          : fetchedLectures;
 
-        const groupedLectures = lectureCategories.map(cat => ({
-          ...cat,
-          lectures: filteredLectures.filter(lecture => lecture.lectureCategory?._id === cat._id)
-                        .sort((a, b) => a.name.localeCompare(b.name)),
-          currentPage: 1
-        })).filter(cat => cat.lectures.length > 0);
-
-        setCategoriesWithLectures(groupedLectures);
+        // Sắp xếp tất cả các bài giảng theo tên (hoặc theo tiêu chí khác nếu muốn)
+        setAllLectures(filteredLectures.sort((a, b) => a.name.localeCompare(b.name)));
+        setCurrentLecturePage(1); // Reset về trang 1 khi filters thay đổi
       } catch (err: unknown) {
         if (axios.isAxiosError(err)) {
           const serverError = err.response?.data as { error?: string, message?: string };
@@ -221,7 +229,7 @@ const LecturesPage: React.FC = () => {
     fetchLecturesData();
   }, [selectedGrades]); // Re-fetch lectures if grade filter changes
 
-  // --- Fetch Essay Topics Data ---
+  // --- Fetch Essay Topics Data (Giữ nguyên) ---
   useEffect(() => {
     const fetchEssayTopicsData = async () => {
       setIsLoadingEssayTopics(true);
@@ -235,14 +243,33 @@ const LecturesPage: React.FC = () => {
         const essayCategories: EssayCategory[] = essayCategoriesRes.data;
         const allEssayTopics: EssayTopicItem[] = essayTopicsRes.data;
 
+        // Moved handleEssayTopicPageChange outside map
+        // const groupedEssayTopics = essayCategories.map(cat => ({
+        //   ...cat,
+        //   topics: allEssayTopics.filter(topic => typeof topic.category === 'object' ? topic.category._id === cat._id : topic.category === cat._id) // Filter by category ID
+        //                 .sort((a, b) => a.name.localeCompare(b.name)),
+        //   currentPage: 1
+        // })).filter(cat => cat.topics.length > 0);
+        // setEssayCategoriesWithTopics(groupedEssayTopics);
+
+        // Fix the issue by ensuring category is an object before filtering
+        const processedEssayTopics = allEssayTopics.map(topic => ({
+            ...topic,
+            category: typeof topic.category === 'string'
+                ? essayCategories.find(cat => cat._id === topic.category) || topic.category
+                : topic.category
+        }));
+
         const groupedEssayTopics = essayCategories.map(cat => ({
-          ...cat,
-          topics: allEssayTopics.filter(topic => typeof topic.category === 'object' ? topic.category._id === cat._id : topic.category === cat._id) // Filter by category ID
-                        .sort((a, b) => a.name.localeCompare(b.name)),
-          currentPage: 1
+            ...cat,
+            topics: processedEssayTopics.filter(topic =>
+                typeof topic.category === 'object' && topic.category?._id === cat._id
+            ).sort((a, b) => a.name.localeCompare(b.name)),
+            currentPage: 1
         })).filter(cat => cat.topics.length > 0);
 
         setEssayCategoriesWithTopics(groupedEssayTopics);
+
       } catch (err: unknown) {
         if (axios.isAxiosError(err)) {
           const serverError = err.response?.data as { error?: string, message?: string };
@@ -257,16 +284,11 @@ const LecturesPage: React.FC = () => {
       }
     };
     fetchEssayTopicsData();
-  }, []);
-
+  }, []); // Added essayCategories to dependency array to avoid re-renders
 
   // --- Handlers for Lectures Pagination and Filters ---
-  const handleLecturePageChange = (categoryId: string, newPage: number) => {
-    setCategoriesWithLectures(prevCategories =>
-      prevCategories.map(category =>
-        category._id === categoryId ? { ...category, currentPage: newPage } : category
-      )
-    );
+  const handleLecturePageChange = (newPage: number) => { // Sửa hàm này không cần categoryId
+    setCurrentLecturePage(newPage);
   };
 
   const handleGradeFilterChange = (grade: number, checked: boolean) => {
@@ -278,30 +300,35 @@ const LecturesPage: React.FC = () => {
   // Lấy danh sách các lớp duy nhất từ tất cả các bài giảng
   const allGrades = useMemo(() => {
     const grades = new Set<number>();
-    categoriesWithLectures.forEach(category => {
-      category.lectures.forEach(lecture => {
-        if (lecture.grade) {
-          grades.add(lecture.grade);
-        }
-      });
+    allLectures.forEach(lecture => { // Duyệt qua allLectures đã gộp
+      if (lecture.grade) {
+        grades.add(lecture.grade);
+      }
     });
     return Array.from(grades).sort((a, b) => a - b);
-  }, [categoriesWithLectures]);
+  }, [allLectures]); // Phụ thuộc vào allLectures
+
+  // Tính toán số trang và bài giảng hiển thị cho phần LECTURES
+  const totalLecturePages = Math.ceil(allLectures.length / lecturesPerPage);
+  const lectureStartIndex = (currentLecturePage - 1) * lecturesPerPage;
+  const lectureEndIndex = lectureStartIndex + lecturesPerPage;
+  const currentLecturesDisplayed = allLectures.slice(lectureStartIndex, lectureEndIndex);
+
 
   // --- Handlers for Essay Topics Pagination ---
-  const handleEssayTopicPageChange = (categoryId: string, newPage: number) => {
+  const handleEssayTopicPageChange = useCallback((categoryId: string, newPage: number) => {
     setEssayCategoriesWithTopics(prevCategories =>
       prevCategories.map(category =>
         category._id === categoryId ? { ...category, currentPage: newPage } : category
       )
     );
-  };
+  }, []); // Sử dụng useCallback để memoize hàm này
 
 
-  // --- Breadcrumbs ---
+  // --- Breadcrumbs (Giữ nguyên) ---
   const breadcrumbItems: BreadcrumbItem[] = useMemo(() => [
     { label: 'Trang chủ', path: '/' },
-    { label: 'Bài giảng & Văn mẫu', path: '/lectures' },
+    { label: 'Bài giảng & Văn mẫu', path: '/mon-ngu-van' },
   ], []);
 
 
@@ -309,13 +336,13 @@ const LecturesPage: React.FC = () => {
     <Layout>
       <div className="min-h-screen bg-background">
         <div className="bg-secondary/50 py-4 border-b border-border">
-          <div className="container mx-auto px-4">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <Breadcrumbs items={breadcrumbItems} />
           </div>
         </div>
-        <main className="container mx-auto px-4 py-8">
+        <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row gap-8">
-            <aside className="w-full md:w-64 shrink-0">
+            <aside className="w-full md:w-52 shrink-0">
               <div className="bg-card rounded-lg border shadow-sm p-5 sticky top-24">
                 <h3 className="font-bold text-lg mb-2 text-card-foreground">Bộ lọc</h3>
                 {/* Lọc theo Lớp học (cho Bài giảng) */}
@@ -358,7 +385,7 @@ const LecturesPage: React.FC = () => {
             </aside>
             <div className="flex-1">
               {/* --- PHẦN HIỂN THỊ BÀI GIẢNG (LECTURES) --- */}
-              <div className="mb-12"> {/* Thêm margin bottom để tách biệt 2 phần chính */}
+              <div className="mb-12">
                 <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">
                   Bài giảng Ngữ văn
                 </h1>
@@ -368,7 +395,7 @@ const LecturesPage: React.FC = () => {
                 <div className="flex flex-wrap items-center justify-between mt-6 bg-card p-4 rounded-lg border shadow-sm">
                   <div className="flex items-center space-x-2 mb-2 sm:mb-0">
                     <Label className="text-muted-foreground">Sắp xếp theo:</Label>
-                    <Select value="newest" onValueChange={() => {}}> {/* Không có sortBy state cho phần này nữa */}
+                    <Select value="newest" onValueChange={() => {}}>
                       <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="Mới nhất" />
                       </SelectTrigger>
@@ -391,80 +418,69 @@ const LecturesPage: React.FC = () => {
               {errorLectures && <p className="text-center text-destructive text-lg py-10">Lỗi: {errorLectures}</p>}
               {!isLoadingLectures && !errorLectures && (
                 <>
-                  {categoriesWithLectures.length === 0 && <p className="text-center text-muted-foreground text-lg py-10">Không có bài giảng nào để hiển thị.</p>}
-                  {categoriesWithLectures.map(category => {
-                    const totalPages = Math.ceil(category.lectures.length / lecturesPerPage);
-                    const startIndex = (category.currentPage - 1) * lecturesPerPage;
-                    const endIndex = startIndex + lecturesPerPage;
-                    const currentLectures = category.lectures.slice(startIndex, endIndex);
-
-                    return (
-                      <section key={`lecture-cat-${category._id}`} className="mb-12">
-                        <div className="flex items-center mb-6">
-                          <h2 className="text-2xl font-bold text-foreground">Bài giảng {category.name}</h2>
-                          <div className="h-px bg-border flex-grow ml-4"></div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {currentLectures.map(lecture => (
-                            <LectureCard
-                              key={lecture._id}
-                              _id={lecture._id}
-                              imgSrc={lecture.imageUrl}
-                              altText={lecture.name}
-                              lectureCategory={lecture.lectureCategory?.name || 'Chưa phân loại'}
-                              grade={lecture.grade}
-                              title={lecture.name}
-                              description={lecture.description}
-                            />
-                          ))}
-                        </div>
-                        {/* Pagination for Lectures */}
+                  {currentLecturesDisplayed.length === 0 ? (
+                    <p className="text-center text-muted-foreground text-lg py-10">Không có bài giảng nào để hiển thị.</p>
+                  ) : (
+                    <section className="mb-12">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {currentLecturesDisplayed.map(lecture => (
+                          <LectureCard
+                            key={lecture._id}
+                            _id={lecture._id}
+                            slug={lecture.slug} // Truyền slug vào component
+                            imgSrc={lecture.imageUrl}
+                            altText={lecture.name}
+                            lectureCategory={
+                                typeof lecture.lectureCategory === 'object' && lecture.lectureCategory?.name
+                                    ? lecture.lectureCategory.name
+                                    : 'N/A'
+                            }
+                            grade={lecture.grade}
+                            title={lecture.name}
+                            description={lecture.description}
+                          />
+                        ))}
+                      </div>
+                      {/* Pagination for Lectures */}
+                      {totalLecturePages > 1 && (
                         <div className="flex flex-col sm:flex-row items-center justify-between mt-8">
-                          {totalPages > 1 && (
-                            <nav className="flex items-center space-x-2 mb-4 sm:mb-0">
+                          <nav className="flex items-center space-x-2 mb-4 sm:mb-0">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleLecturePageChange(Math.max(1, currentLecturePage - 1))}
+                              disabled={currentLecturePage === 1}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            {Array.from({ length: totalLecturePages }, (_, i) => i + 1).map(page => (
                               <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => handleLecturePageChange(category._id, Math.max(1, category.currentPage - 1))}
-                                disabled={category.currentPage === 1}
+                                key={page}
+                                variant={currentLecturePage === page ? 'default' : 'outline'}
+                                onClick={() => handleLecturePageChange(page)}
                               >
-                                <ChevronLeft className="h-4 w-4" />
+                                {page}
                               </Button>
-                              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                                <Button
-                                  key={page}
-                                  variant={category.currentPage === page ? 'default' : 'outline'}
-                                  onClick={() => handleLecturePageChange(category._id, page)}
-                                >
-                                  {page}
-                                </Button>
-                              ))}
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={() => handleLecturePageChange(category._id, Math.min(totalPages, category.currentPage + 1))}
-                                disabled={category.currentPage === totalPages}
-                              >
-                                <ChevronRight className="h-4 w-4" />
-                              </Button>
-                            </nav>
-                          )}
-                          {category.lectures.length > 0 && (
-                            <Link to={`/lecture-category/${category._id}`}>
-                              <Button variant="outline" className="w-full sm:w-auto">
-                                Xem tất cả bài giảng {category.name} <ArrowRight className="ml-2 h-4 w-4" />
-                              </Button>
-                            </Link>
-                          )}
+                            ))}
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => handleLecturePageChange(Math.min(totalLecturePages, currentLecturePage + 1))}
+                              disabled={currentLecturePage === totalLecturePages}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </nav>
+                          {/* Không có nút "Xem tất cả" cho phần bài giảng vì đã hiển thị tất cả */}
                         </div>
-                      </section>
-                    );
-                  })}
+                      )}
+                    </section>
+                  )}
                 </>
               )}
 
               {/* --- PHẦN HIỂN THỊ CHỦ ĐỀ BÀI LUẬN (ESSAY TOPICS) --- */}
-              <div className="mt-12 pt-8 border-t border-border"> {/* Tách biệt rõ ràng 2 phần */}
+              <div className="mt-12 pt-8 border-t border-border">
                 <h1 className="text-4xl font-bold tracking-tight text-foreground mb-2">
                   Chủ đề Bài luận Mẫu
                 </h1>
@@ -525,7 +541,7 @@ const LecturesPage: React.FC = () => {
                               </nav>
                             )}
                             {cat.topics.length > 0 && (
-                              <Link to={`/category/${cat._id}`}> {/* Đây là đường dẫn đến trang chi tiết category essay */}
+                              <Link to={`/category/${cat._id}`}>
                                 <Button variant="outline" className="w-full sm:w-auto">
                                   Xem tất cả chủ đề {cat.name} <ArrowRight className="ml-2 h-4 w-4" />
                                 </Button>

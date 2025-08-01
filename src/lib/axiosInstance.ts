@@ -11,19 +11,16 @@ const axiosInstance = axios.create({
 // Sử dụng interceptor để thêm token vào mỗi request
 axiosInstance.interceptors.request.use(
   (config) => {
-    // Lấy token từ localStorage (hoặc nơi bạn lưu trữ token sau khi đăng nhập)
-    // Giả sử bạn lưu token với key là 'authToken'
     const token = localStorage.getItem('authToken');
 
     if (token) {
-      // Gắn token vào header Authorization
-      // Backend của bạn mong đợi token theo định dạng "Bearer <token>"
-      config.headers['Authorization'] = token; // Token đã bao gồm "Bearer " khi bạn lưu từ response của API login
+      // ĐẢM BẢO TIỀN TỐ "Bearer " ĐƯỢC THÊM VÀO.
+      // Nếu token đã có "Bearer ", nó sẽ không ảnh hưởng. Nếu chưa, nó sẽ thêm vào.
+      config.headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
     }
     return config;
   },
   (error) => {
-    // Xử lý lỗi request
     return Promise.reject(error);
   }
 );

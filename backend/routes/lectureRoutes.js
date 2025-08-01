@@ -1,25 +1,31 @@
 // backend/routes/lectureRoutes.js
 import express from 'express';
-import { getLectures, getLectureById, createLecture, updateLecture, deleteLecture } from '../controllers/lectureController.js';
-// const { protect, authorize } = require('../middleware/authMiddleware');
+import { getLectures, getLectureById, createLecture, updateLecture, deleteLecture, getLectureBySlug } from '../controllers/lectureController.js';
+// import authenticateToken from '../config/authMiddleware.js'; // Nếu bạn có auth middleware
+// import { isAdmin } from '../config/adminMiddleware.js'; // Nếu bạn có admin middleware
 
-import multer from 'multer'; // <<<< Import Multer
+import multer from 'multer';
 
 const router = express.Router();
 
-// Cấu hình Multer để lưu trữ file trong bộ nhớ (memory storage)
-// hoặc một thư mục tạm thời trên đĩa (disk storage)
-// Memory storage là tiện lợi cho Cloudinary vì bạn không cần quản lý file cục bộ
-const upload = multer({ storage: multer.memoryStorage() }); // <<<< Cấu hình Multer
+const upload = multer({ storage: multer.memoryStorage() });
 
-// Áp dụng middleware upload.single('image') cho các route POST/PUT
 router.route('/')
   .get(getLectures)
-  .post(upload.single('image'), createLecture); // <<<< Thêm upload.single('image')
+  // Áp dụng middleware bảo vệ và kiểm tra admin nếu cần
+  // .post(authenticateToken, isAdmin, upload.single('image'), createLecture);
+  .post(upload.single('image'), createLecture); // Tạm thời bỏ authenticateToken, isAdmin để dễ test
+
+// Route mới để lấy bài giảng bằng slug
+router.route('/slug/:slug')
+  .get(getLectureBySlug);
 
 router.route('/:id')
   .get(getLectureById)
-  .put(upload.single('image'), updateLecture)    // <<<< Thêm upload.single('image')
+  // Áp dụng middleware bảo vệ và kiểm tra admin nếu cần
+  // .put(authenticateToken, isAdmin, upload.single('image'), updateLecture)
+  // .delete(authenticateToken, isAdmin, deleteLecture);
+  .put(upload.single('image'), updateLecture)
   .delete(deleteLecture);
 
 export default router;

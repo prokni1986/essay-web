@@ -4,62 +4,66 @@ import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import authenticateToken from '../config/authMiddleware.js'; // Đảm bảo đường dẫn này chính xác
-// import authController from '../controllers/authController.js'; // Không cần nếu bạn nhúng logic trực tiếp như hiện tại
 
 const router = express.Router();
 
 // 1. Đăng ký người dùng mới
 router.post('/register', async (req, res) => {
-  const { username, email, password, password2 } = req.body;
-  let errors = [];
+  const { username, email, password } = req.body; // <-- BỎ password2 ở đây
 
-  if (!username || !email || !password || !password2) {
-    errors.push({ msg: 'Vui lòng điền tất cả các trường.' });
+  // Kiểm tra các trường bắt buộc (chỉ username, email, password)
+  if (!username || !email || !password) {
+    return res.status(400).json({ message: 'Vui lòng điền tất cả các trường.' });
   }
 
-  if (password !== password2) {
-    errors.push({ msg: 'Mật khẩu không khớp.' });
-  }
+  // BỎ kiểm tra password !== password2 ở đây vì frontend đã xử lý
+  // if (password !== password2) {
+  //   return res.status(400).json({ message: 'Mật khẩu không khớp.' });
+  // }
 
-  if (password && password.length < 6) {
-    errors.push({ msg: 'Mật khẩu phải có ít nhất 6 ký tự.' });
-  }
-
-  if (errors.length > 0) {
-    return res.status(400).json({ errors });
-  }
+  // Mongoose Schema sẽ tự động validate minlength và email format
+  // if (password.length < 6) {
+  //   return res.status(400).json({ message: 'Mật khẩu phải có ít nhất 6 ký tự.' });
+  // }
 
   try {
-    let user = await User.findOne({ email: email.toLowerCase() });
-    if (user) {
-      errors.push({ msg: 'Email đã được sử dụng.' });
-      return res.status(400).json({ errors });
-    }
-    user = await User.findOne({ username: username.toLowerCase() });
-    if (user) {
-      errors.push({ msg: 'Username đã được sử dụng.' });
-      return res.status(400).json({ errors });
-    }
-
     const newUser = new User({
-      username,
-      email,
+      username: username.toLowerCase(), // Lưu username và email dưới dạng lowercase để đảm bảo tính duy nhất không phân biệt chữ hoa/thường
+      email: email.toLowerCase(),
       password,
-      // 'role' sẽ được tự động gán là 'user' từ User Model nếu không được cung cấp ở đây.
-      // Nếu bạn muốn cho phép đăng ký admin qua API, bạn cần thêm logic kiểm tra ở đây.
     });
 
-    await newUser.save();
+    await newUser.save(); // Lệnh này sẽ kích hoạt validation và unique check của Mongoose
+
     res.status(201).json({ message: 'Đăng ký thành công! Vui lòng đăng nhập.' });
 
   } catch (err) {
     console.error("Register error:", err);
-    if (err.code === 11000) { // Duplicate key error for unique fields
-        const field = Object.keys(err.keyValue)[0];
-        errors.push({ msg: `Giá trị '${err.keyValue[field]}' cho trường '${field}' đã tồn tại.` });
-        return res.status(400).json({ errors });
+
+    // Xử lý lỗi trùng lặp (E11000 - từ unique: true trong Mongoose Schema)
+    if (err.code === 11000) {
+        const field = Object.keys(err.keyValue)[0]; // Lấy tên trường bị trùng (username hoặc email)
+        const value = err.keyValue[field]; // Lấy giá trị bị trùng
+        let message = '';
+        if (field === 'email') {
+            message = `Email '${value}' đã được sử dụng.`;
+        } else if (field === 'username') {
+            message = `Tên người dùng '${value}' đã được sử dụng.`;
+        } else {
+            message = `Giá trị '${value}' cho trường '${field}' đã tồn tại.`;
+        }
+        return res.status(400).json({ message }); // Trả về thông báo lỗi với cấu trúc { message: '...' }
     }
-    res.status(500).json({ errors: [{ msg: 'Lỗi máy chủ, không thể đăng ký.' }] });
+
+    // Xử lý lỗi validation từ Mongoose (ví dụ: required, minlength, match regex cho email)
+    if (err.name === 'ValidationError') {
+        const messages = Object.values(err.errors).map(error => error.message);
+        // Nối các thông báo lỗi lại thành một chuỗi duy nhất
+        return res.status(400).json({ message: messages.join(', ') }); // Trả về thông báo lỗi với cấu trúc { message: '...' }
+    }
+
+    // Xử lý các lỗi khác không xác định
+    res.status(500).json({ message: 'Lỗi máy chủ, không thể đăng ký.' });
   }
 });
 

@@ -48,9 +48,11 @@ const allowedOrigins = [
   process.env.FRONTEND_URL_ONTHIHUB,
   process.env.FRONTEND_URL_VERCEL,
   process.env.FRONTEND_URL_LOCAL || 'http://localhost:8080',
-  'onthihub.com/','http://onthihub.com',
-  'https://essay-web-neon.vercel.app',
-  
+  'http://www.onthihub.com',
+  'http://onthihub.com',
+  'https://onthihub.com',
+  'http://103.101.163.221:4173',
+  'https://essay-web-neon.vercel.app'
 ].filter(Boolean);
 
 console.log("Allowed Origins for CORS:", allowedOrigins);
@@ -74,7 +76,7 @@ app.use(cors(corsOptions));
 // Middlewares cơ bản
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
+app.use('/uploads', express.static('uploads'));
 // Khởi tạo và cấu hình Passport
 app.use(passport.initialize());
 initializePassport(passport);

@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { useEffect, useState, useCallback, useRef, useMemo } from 'react'; // Đảm bảo useMemo được import
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import axios from 'axios';
 import axiosInstance from '../lib/axiosInstance';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
@@ -11,7 +11,10 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { useTheme } from '../components/theme-provider';
-import Breadcrumbs, { BreadcrumbItem } from '@/components/Breadcrumbs'; // Import Breadcrumbs và BreadcrumbItem
+import Breadcrumbs, { BreadcrumbItem } from '@/components/Breadcrumbs';
+
+// Import Select components from shadcn/ui
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; //
 
 // --- Interfaces ---
 interface EssayTopic {
@@ -58,7 +61,7 @@ const formatTime = (seconds: number): string => {
 interface CustomAudioPlayerProps {
   audioSrc: string | undefined;
   initialDuration: number;
-  variant: 'dark' | 'light'; // Thêm variant để điều khiển màu sắc
+  variant: 'dark' | 'light';
 }
 
 const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({ audioSrc, initialDuration, variant }) => {
@@ -68,26 +71,24 @@ const CustomAudioPlayer: React.FC<CustomAudioPlayerProps> = ({ audioSrc, initial
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(initialDuration);
 
-  // Determine colors based on variant and dark mode
-  // Using theme-based colors for consistency
   const bgColor = variant === 'dark'
-    ? 'bg-primary text-primary-foreground' // Primary color for dark variant
-    : 'bg-muted/30 text-foreground'; // Muted for light variant background, foreground text
+    ? 'bg-primary text-primary-foreground'
+    : 'bg-muted/30 text-foreground';
   const textColor = variant === 'dark'
-    ? 'text-primary-foreground' // Text color for primary background
-    : 'text-foreground'; // Default foreground text
+    ? 'text-primary-foreground'
+    : 'text-foreground';
   const iconColor = variant === 'dark'
-    ? 'text-primary-foreground' // Icon color for dark variant, contrasting with background
-    : 'text-primary'; // Icon color for light variant
+    ? 'text-primary-foreground'
+    : 'text-primary';
   const progressBarBg = variant === 'dark'
-    ? 'bg-primary-foreground/30' // Lighter version of foreground for dark variant progress bar background
-    : 'bg-primary/20'; // Lighter primary for light variant progress bar background
+    ? 'bg-primary-foreground/30'
+    : 'bg-primary/20';
   const progressBarFill = variant === 'dark'
-    ? 'bg-primary-foreground' // Foreground color for dark variant progress bar fill
-    : 'bg-primary'; // Primary color for light variant progress bar fill
+    ? 'bg-primary-foreground'
+    : 'bg-primary';
   const buttonBg = variant === 'dark'
-    ? 'bg-primary-foreground' // Button background contrasting with dark variant
-    : 'bg-background'; // Button background for light variant
+    ? 'bg-primary-foreground/20'
+    : 'bg-background';
 
 
   useEffect(() => {
@@ -266,7 +267,7 @@ const SampleEssay: React.FC = () => {
     const items: BreadcrumbItem[] = [{ label: 'Trang chủ', path: '/' }];
     // Kiểm tra nếu có topic và là object, thì thêm vào breadcrumbs
     if (essay?.topic && typeof essay.topic === 'object') {
-      items.push({ label: essay.topic.name, path: `/topic/${essay.topic._id}` }); // Corrected path for consistency
+      items.push({ label: essay.topic.name, path: `/topic/${essay.topic._id}` });
     }
     // Thêm tiêu đề bài luận hiện tại (luôn là mục cuối cùng, không có path)
     if (essay) {
@@ -345,27 +346,48 @@ const SampleEssay: React.FC = () => {
 
   const currentEssaySection = essaySections.find(sec => sec.id === activeEssaySection);
 
+  // Hàm cuộn trang đến phần "Bài viết mẫu"
+  const scrollToEssayContent = () => {
+    const essayContentSection = document.getElementById('essay-content-section');
+    if (essayContentSection) {
+      essayContentSection.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+
   return (
     <Layout>
 
-      {/* Breadcrumbs (Đã thay thế phần nav cũ bằng component Breadcrumbs tùy chỉnh) */}
+      {/* Breadcrumbs */}
       <section className="bg-secondary/50 py-4 border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> {/* Sử dụng max-w-7xl để nhất quán với các phần khác */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <Breadcrumbs items={breadcrumbItems} />
           </div>
       </section>
 
       <div className={`min-h-screen bg-background text-foreground font-sans`}>
-        {/* Header (Giữ nguyên từ code cũ) */}
+        {/* Header */}
         <header className="bg-card shadow-sm border-b border-border">
-          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
-            <div className="flex items-center">
-              <i className="fas fa-book-open text-primary text-2xl mr-3"></i>
-              <h1 className="text-xl font-semibold text-foreground">
-                Hướng dẫn viết luận
-              </h1>
+          <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex items-center justify-between">
+            {/* Phần bên trái: Icon và Hướng dẫn + Nút */}
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center">
+                <i className="fas fa-book-open text-primary text-2xl mr-3"></i>
+                <h1 className="text-xl font-semibold text-foreground">
+                  Hướng dẫn viết luận
+                </h1>
+              </div>
+              {essaySections.length > 0 && (
+                <button
+                  onClick={scrollToEssayContent}
+                  className="bg-primary text-primary-foreground rounded-md py-2 px-4 text-sm font-semibold hover:bg-primary-foreground hover:text-primary transition duration-200 ease-in-out flex items-center"
+                >
+                  Xem bài luận mẫu <i className="fas fa-arrow-down ml-2"></i>
+                </button>
+              )}
             </div>
-            <div className="text-sm text-muted-foreground">
+            {/* Phần bên phải: Ngày tháng */}
+            <div className="text-sm text-muted-foreground hidden sm:block">
               {new Date().toLocaleDateString("en-US", {
                 weekday: "long",
                 year: "numeric",
@@ -379,24 +401,21 @@ const SampleEssay: React.FC = () => {
         
 
         <main className="max-w-7xl mx-auto px-4 py-8 sm:px-6 lg:px-8">
-          {/* Part 1: Essay Outline Guide (Giữ nguyên từ code cũ) */}
+          {/* Part 1: Essay Outline Guide */}
           <section className="mb-16 bg-card p-4 sm:p-6 rounded-xl shadow-xl border border-border">
             <div className="bg-primary px-6 py-8 sm:px-8 flex flex-col md:flex-row justify-between items-start md:items-center rounded-t-lg -mx-6 -mt-6">
-              {/* Corrected H2 structure for consistency and proper text/icon color */}
               <h2 className="text-white mb-4 md:mb-0 md:flex-1 md:pr-4">
-                <i className="fas fa-flag text-primary-foreground mr-2 text-3xl"></i> {/* Icon color directly set */}
+                <i className="fas fa-flag text-primary-foreground mr-2 text-3xl"></i>
                 <span className="text-2xl font-bold">Dàn ý bài luận:</span><br />
                 <span className="text-base font-normal">{pageTitle}</span>
               </h2>
               <div className="w-full md:w-64">
-                {/* CustomAudioPlayer variant is 'dark' for primary background */}
                 <CustomAudioPlayer audioSrc={essay.audioFiles?.[0]} initialDuration={300} variant="dark" />
               </div>
             </div>
 
             <div className="p-6 sm:p-8">
               <div className="mb-8">
-                {/* Removed redundant H3 here, as it's now part of the main H2 above */}
                 <h3 className="text-xl font-semibold text-foreground mb-4">
                   Cấu trúc thiết yếu
                 </h3>
@@ -407,7 +426,6 @@ const SampleEssay: React.FC = () => {
 
                 {essay.outline ? (
                   <div className="border-l-0 border-primary pl-4">
-                    {/* Removed H4 here, using the overall section title */}
                     <div className="prose dark:prose-invert max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: essay.outline }} />
                   </div>
                 ) : (
@@ -425,7 +443,7 @@ const SampleEssay: React.FC = () => {
                 <div className="grid md:grid-cols-3 gap-6">
                   <div className="bg-background p-4 rounded shadow-sm border border-border">
                     <div className="flex items-center mb-3">
-                      <i className="fas fa-lightbulb text-yellow-500 text-xl mr-2"></i> {/* Keep specific accent colors */}
+                      <i className="fas fa-lightbulb text-yellow-500 text-xl mr-2"></i>
                       <h4 className="font-medium text-foreground">Rõ ràng</h4>
                     </div>
                     <p className="text-muted-foreground text-sm">
@@ -435,7 +453,7 @@ const SampleEssay: React.FC = () => {
                   </div>
                   <div className="bg-background p-4 rounded shadow-sm border border-border">
                     <div className="flex items-center mb-3">
-                      <i className="fas fa-link text-blue-500 text-xl mr-2"></i> {/* Keep specific accent colors */}
+                      <i className="fas fa-link text-blue-500 text-xl mr-2"></i>
                       <h4 className="font-medium text-foreground">Tính mạch lạc</h4>
                     </div>
                     <p className="text-muted-foreground text-sm">
@@ -445,7 +463,7 @@ const SampleEssay: React.FC = () => {
                   </div>
                   <div className="bg-background p-4 rounded shadow-sm border border-border">
                     <div className="flex items-center mb-3">
-                      <i className="fas fa-search text-green-500 text-xl mr-2"></i> {/* Keep specific accent colors */}
+                      <i className="fas fa-search text-green-500 text-xl mr-2"></i>
                       <h4 className="font-medium text-foreground">Bằng chứng</h4>
                     </div>
                     <p className="text-muted-foreground text-sm">
@@ -458,39 +476,43 @@ const SampleEssay: React.FC = () => {
             </div>
           </section>
 
-          {/* Part 2: Essay Content Sections with Dropdown and Side Notes (Giữ nguyên từ code cũ) */}
-          <section className="bg-card p-4 sm:p-6 rounded-xl shadow-xl border border-border">
+          {/* Part 2: Essay Content Sections with Dropdown and Side Notes */}
+          <section id="essay-content-section" className="bg-card p-4 sm:p-6 rounded-xl shadow-xl border border-border">
             <div className="bg-primary px-6 py-8 sm:px-8 flex flex-col md:flex-row justify-between items-start md:items-center rounded-t-lg -mx-6 -mt-6">
-              {/* Corrected H2 structure for consistency and proper text/icon color */}
-              <h2 className="text-primary-foreground mb-4 md:mb-0">  
-                <i className="fas fa-file-alt text-primary-foreground mr-2 text-3xl"></i> {/* Icon color directly set */}
+              <h2 className="text-primary-foreground mb-4 md:mb-0">
+                <i className="fas fa-file-alt text-primary-foreground mr-2 text-3xl"></i>
                 <span className="text-2xl font-bold">Bài viết mẫu :</span><br />
               </h2>
-              {/* This div wraps the dropdown and the hint text/arrow */}
               {essay.canViewFullContent && essaySections.length > 0 && (
                 <div className="flex items-center space-x-3 text-primary-foreground text-sm relative w-full md:w-auto flex-shrink-0">
-                  {/* Hint text and arrow */}
                   <span className="hidden md:inline-flex items-center text-sm font-medium mr-2">
                     Click vào đây để chọn các bài mẫu khác
                     <i className="fas fa-arrow-right ml-2 text-primary-foreground"></i>
                   </span>
-                  {/* Essay Selector Dropdown */}
-                  <div className="relative w-full md:w-64">
-                    <select
-                      value={activeEssaySection}
-                      onChange={(e) => setActiveEssaySection(parseInt(e.target.value) as 1 | 2 | 3)}
-                      className="block w-full bg-primary-foreground/20 border border-primary-foreground/30 rounded-lg py-3 px-4 pr-10 text-primary-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-primary-foreground/50 cursor-pointer"
-                    >
-                      {essaySections.map((sec) => (
-                        <option key={sec.id} value={sec.id}>
-                          {sec.title}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-primary-foreground">
-                      <i className="fas fa-chevron-down"></i>
-                    </div>
-                  </div>
+                  {/* Sử dụng Shadcn/ui Select component */}
+                  <Select
+                      value={String(activeEssaySection)} // Giá trị phải là string
+                      onValueChange={(value) => setActiveEssaySection(parseInt(value) as 1 | 2 | 3)} //
+                  >
+                      <SelectTrigger
+                          className="w-full md:w-64 bg-primary-foreground/20 border border-primary-foreground/30 rounded-lg py-3 px-4 text-primary-foreground appearance-none focus:outline-none focus:ring-2 focus:ring-primary-foreground/50 cursor-pointer"
+                      >
+                          <SelectValue placeholder="Chọn bài luận mẫu" />
+                      </SelectTrigger>
+                      <SelectContent
+                          className="bg-card border border-border text-foreground shadow-lg" // Tùy chỉnh màu nền, viền cho dropdown content
+                      >
+                          {essaySections.map((sec) => (
+                              <SelectItem
+                                  key={sec.id}
+                                  value={String(sec.id)}
+                                  className="hover:bg-accent hover:text-accent-foreground cursor-pointer" //
+                              >
+                                  {sec.title}
+                              </SelectItem>
+                          ))}
+                      </SelectContent>
+                  </Select>
                 </div>
               )}
             </div>
@@ -502,24 +524,22 @@ const SampleEssay: React.FC = () => {
                     <div className="md:col-span-2">
                       <div className="pb-4">
                         <div className="flex items-center mb-2">
-                          <div className="w-1 h-8 bg-primary mr-3"></div> {/* Accent color for marker */}
+                          <div className="w-1 h-8 bg-primary mr-3"></div>
                           <h3 className="text-xl font-bold text-foreground">
                             {currentEssaySection.title}: {pageTitle}
                           </h3>
                         </div>
-                        {/* Audio Player for the selected Essay Section */}
-                        <div className="mb-6"> 
+                        <div className="mb-6">
                           <CustomAudioPlayer audioSrc={currentEssaySection.audio} initialDuration={270} variant="light" />
                         </div>
-                        <div className="prose dark:prose-invert max-w-none text-muted-foreground text-justify " dangerouslySetInnerHTML={{ __html: currentEssaySection.content || '' }} /> {/* Sử dụng || '' để đảm bảo không null */}
-                        
+                        <div className="prose dark:prose-invert max-w-none text-muted-foreground text-justify " dangerouslySetInnerHTML={{ __html: currentEssaySection.content || '' }} />
                       </div>
                     </div>
 
                     <div className="md:col-span-1 space-y-6">
                       <div className="bg-muted/30 p-5 rounded-lg border border-border">
                         <h4 className="text-primary font-medium mb-3 flex items-center">
-                          <i className="fas fa-lightbulb text-primary mr-2"></i> {/* Consistent with primary color */}
+                          <i className="fas fa-lightbulb text-primary mr-2"></i>
                           Điểm mạnh chính
                         </h4>
                         <ul className="text-sm text-muted-foreground space-y-2">
@@ -544,7 +564,7 @@ const SampleEssay: React.FC = () => {
 
                       <div className="bg-muted/30 p-5 rounded-lg border border-border">
                         <h4 className="text-foreground font-medium mb-3 flex items-center">
-                          <i className="fas fa-search text-primary mr-2"></i> {/* Consistent with primary color */}
+                          <i className="fas fa-search text-primary mr-2"></i>
                           Ghi chú phân tích
                         </h4>
                         <p className="text-sm text-muted-foreground mb-3">
@@ -562,7 +582,6 @@ const SampleEssay: React.FC = () => {
                   <p className="text-center text-muted-foreground">Không có nội dung cho phần bài luận này.</p>
                 )
               ) : (
-                // Limited access view for detailed essays (Giữ nguyên từ code cũ)
                 <div className="mt-10 p-6 border-2 border-dashed border-primary/50 rounded-lg text-center bg-card shadow-lg">
                   <h2 className="text-2xl font-semibold text-primary mb-4">Nội dung bị giới hạn</h2>
                   <p className="text-muted-foreground mb-6 leading-relaxed">
@@ -576,7 +595,6 @@ const SampleEssay: React.FC = () => {
                       </>
                     ) : (
                       <>
-                        {/* Only show subscribe buttons if not already full access */}
                         {essay.subscriptionStatus !== 'full_access' && essay.subscriptionStatus !== 'subscribed_specific' && (
                           <Button onClick={() => handleSubscribeEssay(essay._id)}>Đăng ký bài luận này</Button>
                         )}

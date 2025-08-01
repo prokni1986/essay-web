@@ -4,8 +4,8 @@ import axiosInstance from '@/lib/axiosInstance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -30,8 +30,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, PlusCircle, Edit, Trash2, BookText, Folder } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, BookText, Folder, XCircle } from 'lucide-react';
 import { cn } from '@/utils';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 
 // --- Interfaces ---
 interface LectureCategory {
@@ -45,9 +47,10 @@ interface LectureCategory {
 interface Lecture {
   _id: string;
   name: string;
+  slug: string; // <<<< THÊM TRƯỜNG NÀY
   description?: string;
   imageUrl?: string;
-  imagePublicId?: string; // Thêm publicId
+  imagePublicId?: string;
   videoUrl?: string;
   content?: string;
   lectureCategory: string | LectureCategory;
@@ -77,15 +80,33 @@ const AdminLectureDashboard: React.FC<AdminLectureDashboardProps> = ({ showPageM
   const [currentLecture, setCurrentLecture] = useState<Lecture | null>(null);
   const [lectureName, setLectureName] = useState('');
   const [lectureDescription, setLectureDescription] = useState('');
-  const [lectureImageFile, setLectureImageFile] = useState<File | null>(null); // State cho File
-  const [lectureImagePreview, setLectureImagePreview] = useState<string | null>(null); // State cho Preview
-  const [currentLectureImageUrl, setCurrentLectureImageUrl] = useState<string | null>(null); // State cho URL ảnh cũ khi sửa
+  const [lectureImageFile, setLectureImageFile] = useState<File | null>(null);
+  const [lectureImagePreview, setLectureImagePreview] = useState<string | null>(null);
+  const [currentLectureImageUrl, setCurrentLectureImageUrl] = useState<string | null>(null);
   const [topicVideoUrl, setTopicVideoUrl] = useState('');
   const [lectureContent, setLectureContent] = useState('');
   const [selectedLectureCategory, setSelectedLectureCategory] = useState('');
   const [lectureGrade, setLectureGrade] = useState('');
   const [isLectureDialogOpen, setIsLectureDialogOpen] = useState(false);
 
+  // Cấu hình ReactQuill modules và formats
+  const quillModules = {
+    toolbar: [
+      [{ 'header': '1' }, { 'header': '2' }, { 'font': [] }],
+      [{ size: [] }],
+      ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+      [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+      ['link', 'image', 'video'],
+      ['clean']
+    ],
+  };
+
+  const quillFormats = [
+    'header', 'font', 'size',
+    'bold', 'italic', 'underline', 'strike', 'blockquote',
+    'list', 'bullet', 'indent',
+    'link', 'image', 'video'
+  ];
 
   // --- Helper để xử lý file input ---
   const handleFileChange = (
@@ -122,6 +143,7 @@ const AdminLectureDashboard: React.FC<AdminLectureDashboardProps> = ({ showPageM
   const fetchLectures = useCallback(async () => {
     try {
       const res = await axiosInstance.get<Lecture[]>('/api/lectures');
+      // Đảm bảo lectureCategory là đối tượng nếu nó chỉ là ID
       const lecturesWithCategoryObjects = res.data.map(lecture => ({
         ...lecture,
         lectureCategory: lectureCategories.find(cat => cat._id === lecture.lectureCategory) || lecture.lectureCategory
@@ -149,7 +171,7 @@ const AdminLectureDashboard: React.FC<AdminLectureDashboardProps> = ({ showPageM
   }, [isLoading, lectureCategories, fetchLectures]);
 
 
-  // --- LectureCategory Handlers ---
+  // --- LectureCategory Handlers (Giữ nguyên) ---
   const handleAddLectureCategoryClick = () => {
     setCurrentLectureCategory(null);
     setLectureCategoryName('');
@@ -228,9 +250,9 @@ const AdminLectureDashboard: React.FC<AdminLectureDashboardProps> = ({ showPageM
     setCurrentLecture(lecture);
     setLectureName(lecture.name);
     setLectureDescription(lecture.description || '');
-    setLectureImageFile(null); // Reset file input
-    setCurrentLectureImageUrl(lecture.imageUrl || null); // Lưu URL cũ
-    setLectureImagePreview(lecture.imageUrl || null); // Hiển thị ảnh cũ trong preview
+    setLectureImageFile(null);
+    setCurrentLectureImageUrl(lecture.imageUrl || null);
+    setLectureImagePreview(lecture.imageUrl || null);
     setTopicVideoUrl(lecture.videoUrl || '');
     setLectureContent(lecture.content || '');
     setSelectedLectureCategory(typeof lecture.lectureCategory === 'object' ? lecture.lectureCategory._id : lecture.lectureCategory);
@@ -256,7 +278,7 @@ const AdminLectureDashboard: React.FC<AdminLectureDashboardProps> = ({ showPageM
 
     if (lectureImageFile) {
         formData.append('image', lectureImageFile);
-    } else if (!lectureImagePreview && currentLectureImageUrl) {
+    } else if (currentLectureImageUrl && !lectureImagePreview) {
         formData.append('removeCurrentImage', 'true');
     }
 
@@ -451,7 +473,9 @@ const AdminLectureDashboard: React.FC<AdminLectureDashboardProps> = ({ showPageM
                     </TableCell>
                     <TableCell className="font-medium">{lecture.name}</TableCell>
                     <TableCell>
-                      {typeof lecture.lectureCategory === 'object' ? lecture.lectureCategory.name : 'N/A'}
+                      {lecture.lectureCategory && typeof lecture.lectureCategory === 'object'
+                        ? lecture.lectureCategory.name
+                        : 'N/A'}
                     </TableCell>
                     <TableCell>{lecture.grade}</TableCell>
                     <TableCell className="text-muted-foreground hidden md:table-cell">
@@ -537,11 +561,10 @@ const AdminLectureDashboard: React.FC<AdminLectureDashboardProps> = ({ showPageM
                   <Label htmlFor="lectureDescription" className="block text-sm font-medium mb-1">
                     Mô tả ngắn
                   </Label>
-                  <Textarea
+                  <Input
                     id="lectureDescription"
                     value={lectureDescription}
                     onChange={(e) => setLectureDescription(e.target.value)}
-                    className="min-h-[80px]"
                   />
                 </div>
 
@@ -556,17 +579,23 @@ const AdminLectureDashboard: React.FC<AdminLectureDashboardProps> = ({ showPageM
                     accept="image/*"
                     onChange={(e) => handleFileChange(e, setLectureImageFile, setLectureImagePreview)}
                   />
-                  {lectureImagePreview && (
+                  {(lectureImagePreview || currentLectureImageUrl) && (
                     <div className="mt-2 relative inline-block">
-                      <img src={lectureImagePreview} alt="Preview" className="w-32 h-auto object-cover rounded-md border" />
+                      <img src={lectureImagePreview || currentLectureImageUrl || ''} alt="Preview" className="w-32 h-auto object-cover rounded-md border" />
                       <Button
                         type="button"
                         variant="destructive"
                         size="icon"
                         className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
-                        onClick={() => { setLectureImageFile(null); setLectureImagePreview(null); setCurrentLectureImageUrl(null); }}
+                        onClick={() => { 
+                            setLectureImageFile(null); 
+                            setLectureImagePreview(null); 
+                            if (currentLectureImageUrl) {
+                                setCurrentLectureImageUrl(null);
+                            }
+                        }}
                       >
-                        X
+                        <XCircle className="h-4 w-4" />
                       </Button>
                     </div>
                   )}
@@ -581,21 +610,22 @@ const AdminLectureDashboard: React.FC<AdminLectureDashboardProps> = ({ showPageM
                     id="topicVideoUrl"
                     value={topicVideoUrl}
                     onChange={(e) => setTopicVideoUrl(e.target.value)}
-                    placeholder="VD: https://www.youtube.com/watch?v=..."
+                    placeholder="VD: https://www.youtube.com/watch?v=dQw4w9WgXcQ"
                   />
                 </div>
 
-                {/* Nội dung chi tiết */}
+                {/* Nội dung chi tiết - Sử dụng ReactQuill */}
                 <div className="md:col-span-2">
                   <Label htmlFor="lectureContent" className="block text-sm font-medium mb-1">
                     Nội dung chi tiết
                   </Label>
-                  <Textarea
-                    id="lectureContent"
+                  <ReactQuill
+                    theme="snow"
                     value={lectureContent}
-                    onChange={(e) => setLectureContent(e.target.value)}
-                    className="min-h-[150px]"
-                    placeholder="Nội dung HTML hoặc Markdown"
+                    onChange={setLectureContent}
+                    modules={quillModules}
+                    formats={quillFormats}
+                    className="min-h-[200px]"
                   />
                 </div>
               

@@ -3,21 +3,26 @@ import { createContext } from 'react';
 
 // Định nghĩa các kiểu dữ liệu
 export interface User {
-  id: string;
+  id: string; // Đảm bảo khớp với _id nếu từ MongoDB
   email: string;
   username: string;
-  role: 'user' | 'admin'; // Đảm bảo role được định nghĩa ở đây
+  role: 'user' | 'admin';
+}
+
+// Định nghĩa kiểu trả về cho các hàm login/register
+export interface AuthResult {
+  success: boolean;
+  message?: string;
 }
 
 export interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   isLoading: boolean;
-  login: (emailOrUsername: string, password: string) => Promise<boolean>;
-  register: (username: string, email: string, password: string) => Promise<boolean>;
+  login: (emailOrUsername: string, password: string) => Promise<AuthResult>; // Sửa kiểu trả về
+  register: (username: string, email: string, password: string) => Promise<AuthResult>; // Sửa kiểu trả về
   logout: () => void;
-  userRole?: 'user' | 'admin' | null; // <-- THÊM DÒNG NÀY ĐỂ KHẮC PHỤC LỖI
-                                     // Dùng kiểu cụ thể cho role và có thể là null/undefined
+  userRole?: 'user' | 'admin' | null;
 }
 
 // Tạo và export Context

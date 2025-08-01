@@ -39,10 +39,10 @@ import LichThiPage from './pages/LichThiPage';
 import AdminPage from './pages/AdminPage';
 import ExamSolutionPage from './pages/ExamSolutionPage';
 // THÊM MỚI: Import các trang Quiz
-import QuizPage from './pages/QuizPage'; // Trang chính cho học sinh làm trắc nghiệm
-import AdminQuizPage from './pages/AdminQuizPage'; // Trang quản trị đề trắc nghiệm
+import QuizPage from './pages/QuizPage';
+import AdminQuizPage from './pages/AdminQuizPage';
 import AdminLecturePage from './pages/AdminLecturePage';
-import LectureDetailPage from './pages/LectureDetailPage'; // <<<< Import LectureDetailPage
+import LectureDetailPage from './pages/LectureDetailPage';
 
 const queryClient = new QueryClient();
 
@@ -71,8 +71,8 @@ const App = () => (
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/tra-cuu/lich-thi" element={<LichThiPage />} />
-            <Route path="/lectures" element={<LecturesPage />} />
-            <Route path="/lectures/:id" element={<LectureDetailPage />} />
+            {/* Cập nhật route này để sử dụng slug */}
+            <Route path="/mon-ngu-van/:slug" element={<LectureDetailPage />} />
             {/* THÊM MỚI: Public Route cho Đề thi Trắc nghiệm (Học sinh) */}
             <Route path="/interactive-exams" element={<QuizPage />} />
             <Route path="/exams/:id/content" element={<ExamContentPage />} />

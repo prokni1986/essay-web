@@ -13,10 +13,10 @@
     --card: 0 0% 100%; /* Nền card, giống background để card nổi bật bằng shadow/border */
     --card-foreground: 222.2 84% 4.9%; /* Chữ trên card, giống foreground */
 
-    --popover: 0 0% 100%; /* Nền popover */
+    --popover: 0, 0%, 15%; /* Nền popover */
     --popover-foreground: 222.2 84% 4.9%; /* Chữ trên popover */
 
-    --primary: 142 76% 36%; /* Màu chủ đạo: Xanh dương (blue-600) */
+    --primary: 180 60% 45%    ; /*Mầu này là mầu chủ đạo của WEB  */
     --primary-foreground: 0 0% 100%; /* Chữ trên màu chủ đạo: Trắng */
 
     --secondary: 210 40% 96.1%; /* Màu phụ: Xám rất nhạt (cho các section xen kẽ) */
@@ -25,7 +25,7 @@
     --muted: 210 40% 96.1%; /* Màu nền cho các phần tử "muted" */
     --muted-foreground: 215.4 16.3% 46.9%; /* Màu chữ cho các phần tử "muted" */
 
-    --accent: 150 60% 88%; /* Màu nhấn: Xám nhạt (thường dùng cho hover/focus) */
+    --accent: 210 40% 96.1%; /* Màu nhấn: Xám nhạt (thường dùng cho hover/focus) */
     --accent-foreground: 222.2 47.4% 11.2%; /* Chữ trên màu nhấn */
 
     --destructive: 0 84.2% 60.2%; /* Màu cảnh báo/lỗi: Đỏ */

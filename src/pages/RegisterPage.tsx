@@ -1,11 +1,12 @@
 // src/pages/RegisterPage.tsx
 import React, { useState } from 'react';
-import { useAuth } from '../hooks/useAuth'; 
+import { useAuth } from '../hooks/useAuth';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Layout from '@/components/Layout';
+import { toast } from 'sonner';
 
 const RegisterPage: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -18,12 +19,26 @@ const RegisterPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      alert('Mật khẩu không khớp!'); // Hoặc dùng toast
+      toast.error('Mật khẩu xác nhận không khớp!');
       return;
     }
-    const success = await register(username, email, password);
-    if (success) {
-      navigate('/login'); // Chuyển đến trang đăng nhập sau khi đăng ký thành công
+
+    console.log("Đang gửi đăng ký với:");
+    console.log("Username:", username);
+    console.log("Email:", email);
+    console.log("Password:", password ? '********' : 'Không có mật khẩu');
+    console.log("Confirm Password:", confirmPassword ? '********' : 'Không có xác nhận mật khẩu');
+
+    // TypeScript giờ sẽ hiểu `result` là AuthResult
+    const result = await register(username, email, password);
+
+    console.log("Kết quả đăng ký:", result);
+
+    if (result.success) { // Kiểm tra thuộc tính 'success'
+      toast.success(result.message || 'Đăng ký tài khoản thành công! Vui lòng đăng nhập.');
+      navigate('/login');
+    } else {
+      toast.error(result.message || 'Đăng ký thất bại. Vui lòng thử lại.'); // Truy cập thuộc tính 'message'
     }
   };
 
